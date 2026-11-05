@@ -1,0 +1,233 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: vibe_chats
+    // Document ID: {chatId}
+    // Fields:
+    //   - id: string (optional, max 128 chars) - Client or cloud generated chat session ID
+    //   - title: string (required, 1-200 chars) - Title of the trading analysis session
+    //   - tradingMode: string (optional, max 50 chars) - Persona mode (hedge_fund, sniper_scalp, etc.)
+    //   - messages: list of maps (optional, max 500 items) - Inline message history
+    //   - lastActive: number or timestamp (optional) - Timestamp/epoch ms of last activity
+    //   - createdAt: timestamp or number (optional, immutable once set) - Creation timestamp
+    //   - updatedAt: timestamp or number (optional) - Last update timestamp
+    //   - userId: string (optional, max 128 chars) - Client or user identifier
+    //   - uid: string (optional, max 128 chars) - Firebase Auth UID if authenticated
+    //
+    // Subcollection: vibe_chats/{chatId}/messages/{messageId}
+    // Document ID: {messageId}
+    // Fields:
+    //   - id: string (optional, max 128 chars)
+    //   - role: string (required, max 20 chars) - 'user' | 'assistant' | 'model' | 'system'
+    //   - content: string (required, max 50000 chars) - Message text
+    //   - tradingMode: string (optional, max 50 chars)
+    //   - image: string or null (optional, max 100000 chars) - Base64 or image URL
+    //   - timestamp: number or timestamp (optional)
+    //   - createdAt: timestamp or number (optional)
+    //   - updatedAt: timestamp or number (optional)
+    //   - userId: string (optional, max 128 chars)
+    //   - uid: string (optional, max 128 chars)
+    //
+    // Collection: vibe_trading_journal
+    // Document ID: {journalId}
+    // Fields:
+    //   - id / journalId: string (optional, max 128 chars) - Unique journal entry ID
+    //   - asset / symbol / pair / ticker: string (optional, max 50 chars) - e.g. 'GOLD', 'XAUUSD', 'NIFTY'
+    //   - signal / action / decision / type / direction: string (optional, max 50 chars) - e.g. 'BUY', 'SELL'
+    //   - entryPrice / entry: number or string (optional, max 50 chars) - Trade entry level
+    //   - stopLoss / sl: number or string (optional, max 50 chars) - Invalidation stop level
+    //   - target / target1 / target2: number or string (optional, max 100 chars) - Profit targets
+    //   - targets: list of numbers or strings (optional, max 10 items) - List of profit targets
+    //   - riskReward / riskRewardRatio / rrRatio: number or string (optional, max 50 chars) - e.g. 2.0 or '1:2'
+    //   - confidence / confidenceScore: number or string (optional, max 50 chars) - e.g. 85 or '85%'
+    //   - status: string (optional, max 50 chars) - 'OPEN' | 'CLOSED' | 'WIN' | 'LOSS' | 'PENDING'
+    //   - timeframe: string (optional, max 20 chars) - e.g. '5m', '15m', '1h'
+    //   - tradingMode: string (optional, max 50 chars) - Persona mode
+    //   - notes / thesis / reason / reasoning / summary: string (optional, max 5000 chars) - Trade notes/thesis
+    //   - pnl / profit / outcome: number or string (optional, max 50 chars) - Realized or paper P&L
+    //   - dateStr: string (optional, max 50 chars) - Formatted date string
+    //   - createdAt: timestamp or number (optional, immutable once set) - Creation timestamp
+    //   - updatedAt: timestamp or number (optional) - Update timestamp
+    //   - timestamp: number or timestamp (optional)
+    //   - userId / uid: string (optional, max 128 chars) - Client or user identifier
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() >= minLen &&
+              request.resource.data[field].size() <= maxLen);
+    }
+
+    function isValidOptionalNumberOrString(field, maxLen) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is number) ||
+             (request.resource.data[field] is string && request.resource.data[field].size() <= maxLen);
+    }
+
+    function isValidOptionalTime(field) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is timestamp) ||
+             (request.resource.data[field] is number);
+    }
+
+    function isImmutableUnchanged(field) {
+      return !(field in resource.data) ||
+             (field in request.resource.data && request.resource.data[field] == resource.data[field]);
+    }
+
+    // ===============================================================
+    // Domain Validators (Validator Function Pattern)
+    // ===============================================================
+
+    function isValidChatDoc(data) {
+      let allowedKeys = [
+        'id', 'title', 'tradingMode', 'messages', 'lastActive',
+        'createdAt', 'updatedAt', 'userId', 'uid'
+      ];
+      return data.keys().hasOnly(allowedKeys) &&
+             ('title' in data && data.title is string && data.title.size() >= 1 && data.title.size() <= 200) &&
+             isValidOptionalString('id', 1, 128) &&
+             isValidOptionalString('tradingMode', 1, 50) &&
+             (!('messages' in data) || (data.messages is list && data.messages.size() <= 500)) &&
+             isValidOptionalTime('lastActive') &&
+             isValidOptionalTime('createdAt') &&
+             isValidOptionalTime('updatedAt') &&
+             isValidOptionalString('userId', 1, 128) &&
+             isValidOptionalString('uid', 1, 128);
+    }
+
+    function isValidChatMessage(data) {
+      let allowedKeys = [
+        'id', 'role', 'content', 'tradingMode', 'image',
+        'timestamp', 'createdAt', 'updatedAt', 'userId', 'uid'
+      ];
+      return data.keys().hasOnly(allowedKeys) &&
+             ('role' in data && data.role is string && data.role.size() >= 1 && data.role.size() <= 20) &&
+             ('content' in data && data.content is string && data.content.size() <= 50000) &&
+             isValidOptionalString('id', 1, 128) &&
+             isValidOptionalString('tradingMode', 1, 50) &&
+             (!('image' in data) || data.image == null || (data.image is string && data.image.size() <= 100000)) &&
+             isValidOptionalTime('timestamp') &&
+             isValidOptionalTime('createdAt') &&
+             isValidOptionalTime('updatedAt') &&
+             isValidOptionalString('userId', 1, 128) &&
+             isValidOptionalString('uid', 1, 128);
+    }
+
+    function isValidJournalEntry(data) {
+      let allowedKeys = [
+        'id', 'journalId', 'asset', 'symbol', 'pair', 'ticker',
+        'signal', 'action', 'decision', 'type', 'direction',
+        'entryPrice', 'entry', 'stopLoss', 'sl', 'target', 'target1', 'target2', 'targets',
+        'riskReward', 'riskRewardRatio', 'rrRatio', 'confidence', 'confidenceScore',
+        'status', 'timeframe', 'tradingMode', 'notes', 'thesis', 'reason', 'reasoning',
+        'summary', 'pnl', 'profit', 'outcome', 'dateStr', 'createdAt', 'updatedAt',
+        'timestamp', 'userId', 'uid'
+      ];
+      return data.keys().hasOnly(allowedKeys) &&
+             isValidOptionalString('id', 1, 128) &&
+             isValidOptionalString('journalId', 1, 128) &&
+             isValidOptionalString('asset', 1, 50) &&
+             isValidOptionalString('symbol', 1, 50) &&
+             isValidOptionalString('pair', 1, 50) &&
+             isValidOptionalString('ticker', 1, 50) &&
+             isValidOptionalString('signal', 1, 50) &&
+             isValidOptionalString('action', 1, 50) &&
+             isValidOptionalString('decision', 1, 50) &&
+             isValidOptionalString('type', 1, 50) &&
+             isValidOptionalString('direction', 1, 50) &&
+             isValidOptionalNumberOrString('entryPrice', 50) &&
+             isValidOptionalNumberOrString('entry', 50) &&
+             isValidOptionalNumberOrString('stopLoss', 50) &&
+             isValidOptionalNumberOrString('sl', 50) &&
+             isValidOptionalNumberOrString('target', 100) &&
+             isValidOptionalNumberOrString('target1', 100) &&
+             isValidOptionalNumberOrString('target2', 100) &&
+             (!('targets' in data) || (data.targets is list && data.targets.size() <= 10)) &&
+             isValidOptionalNumberOrString('riskReward', 50) &&
+             isValidOptionalNumberOrString('riskRewardRatio', 50) &&
+             isValidOptionalNumberOrString('rrRatio', 50) &&
+             isValidOptionalNumberOrString('confidence', 50) &&
+             isValidOptionalNumberOrString('confidenceScore', 50) &&
+             isValidOptionalString('status', 1, 50) &&
+             isValidOptionalString('timeframe', 1, 20) &&
+             isValidOptionalString('tradingMode', 1, 50) &&
+             isValidOptionalString('notes', 0, 5000) &&
+             isValidOptionalString('thesis', 0, 5000) &&
+             isValidOptionalString('reason', 0, 5000) &&
+             isValidOptionalString('reasoning', 0, 5000) &&
+             isValidOptionalString('summary', 0, 5000) &&
+             isValidOptionalNumberOrString('pnl', 50) &&
+             isValidOptionalNumberOrString('profit', 50) &&
+             isValidOptionalNumberOrString('outcome', 50) &&
+             isValidOptionalString('dateStr', 1, 50) &&
+             isValidOptionalTime('createdAt') &&
+             isValidOptionalTime('updatedAt') &&
+             isValidOptionalTime('timestamp') &&
+             isValidOptionalString('userId', 1, 128) &&
+             isValidOptionalString('uid', 1, 128);
+    }
+
+    // ===============================================================
+    // Rules for Collections
+    // ===============================================================
+
+    // 1. vibe_chats: Trading chat sessions and conversation memories
+    match /vibe_chats/{chatId} {
+      allow read: if true;
+      allow create: if isValidChatDoc(request.resource.data);
+      allow update: if isValidChatDoc(request.resource.data) &&
+                       isImmutableUnchanged('createdAt') &&
+                       isImmutableUnchanged('id');
+      allow delete: if true;
+
+      // Subcollection: vibe_chats/{chatId}/messages/{messageId}
+      match /messages/{messageId} {
+        allow read: if true;
+        allow create: if isValidChatMessage(request.resource.data);
+        allow update: if isValidChatMessage(request.resource.data) &&
+                         isImmutableUnchanged('createdAt') &&
+                         isImmutableUnchanged('id');
+        allow delete: if true;
+      }
+    }
+
+    // 2. vibe_trading_journal: Trade setups, signals, stop loss, targets & risk metrics
+    match /vibe_trading_journal/{journalId} {
+      allow read: if true;
+      allow create: if isValidJournalEntry(request.resource.data);
+      allow update: if isValidJournalEntry(request.resource.data) &&
+                       isImmutableUnchanged('createdAt') &&
+                       isImmutableUnchanged('id') &&
+                       isImmutableUnchanged('journalId');
+      allow delete: if true;
+    }
+
+    // ===============================================================
+    // Default Deny Rule for All Other Collections
+    // ===============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

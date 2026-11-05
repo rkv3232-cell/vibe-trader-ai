@@ -1,0 +1,60 @@
+{
+  "wallet": {
+    "initialCapital": 100000,
+    "balance": 100000,
+    "equity": 100175.49,
+    "realizedPnL": 0,
+    "unrealizedPnL": 175.49,
+    "winCount": 0,
+    "lossCount": 0,
+    "totalTrades": 0,
+    "winRate": 0,
+    "peakEquity": 100417.65,
+    "maxDrawdownPct": 0.5
+  },
+  "activePosition": {
+    "id": "trade_1793894606124",
+    "symbol": "PAXGUSDT",
+    "assetName": "Gold (PAXG/USD)",
+    "type": "BUY",
+    "entryPrice": 4080.66,
+    "currentPrice": 4082.45,
+    "stopLoss": 4070.46,
+    "targetPrice": 4101.06,
+    "riskAmount": 1000,
+    "targetProfit": 2000,
+    "unrealizedPnL": 175.49,
+    "unrealizedPnLPct": 0.04,
+    "isTrailingActive": false,
+    "openedAt": "21:33:26"
+  },
+  "tradeHistory": [],
+  "activeAssetKey": "XAUUSD",
+  "logs": [
+    {
+      "time": "21:33:26",
+      "category": "ORDER",
+      "message": "🚀 EXECUTED VIRTUAL BUY: Gold (PAXG/USD) @ 4080.66 | SL: 4070.46 | Target: 4101.06 (1:2 R:R, Max Risk: ₹1000)",
+      "id": 1793894606125.5142
+    },
+    {
+      "time": "21:33:26",
+      "category": "MIND",
+      "message": "Watching Gold (PAXG/USD) at 4080.66. 20 EMA: 4080.66 | RSI: 50.",
+      "id": 1793894606124.977
+    },
+    {
+      "time": "21:33:19",
+      "category": "SYSTEM",
+      "message": "🟢 24/7 Autonomous Human Trader STARTED on Gold (PAXG/USD).",
+      "id": 1793894599017.3857
+    },
+    {
+      "time": "21:32:35",
+      "category": "RESET",
+      "message": "Virtual Account Reset to ₹1,00,000. Ready for fresh 24/7 compounding.",
+      "id": 1793894555530.129
+    }
+  ],
+  "updatedAt": "2026-11-05T16:10:27.166Z"
+}

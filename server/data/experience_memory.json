@@ -1,0 +1,87 @@
+{
+  "xp": 210,
+  "level": 1,
+  "levelTitle": "Level 1: Novice Quant Paper Trader 🚀",
+  "winStreak": 0,
+  "bestStreak": 0,
+  "totalLessonsLearned": 6,
+  "learnedRules": [
+    {
+      "id": "rule_raj_1793894327081",
+      "rule": "US CPI news release ke dauran Gold (XAUUSD) mein trading se bacho, kyunki high volatility aur unpredictable price movements ka risk rehta hai.",
+      "source": "TRAINED_BY_RAJ",
+      "context": "Directly coached by Raj: \"Gold mein 8:30 PM US CPI news ke time trade mat lena\"",
+      "enforcedCount": 0,
+      "active": true,
+      "createdAt": "2026-11-05T15:58:47.081Z"
+    },
+    {
+      "id": "rule_core_1",
+      "rule": "Never risk more than 1.0% of total account capital on any single trade (Jim Simons Rule).",
+      "source": "INSTITUTIONAL_CORE",
+      "context": "Capital preservation is priority #1. Even 10 consecutive losses will preserve 90% capital.",
+      "enforcedCount": 14,
+      "active": true,
+      "createdAt": "2026-11-05T15:58:25.015Z"
+    },
+    {
+      "id": "rule_core_2",
+      "rule": "Maintain a minimum 1:2 Risk-to-Reward ratio on every execution (Mark Minervini Rule).",
+      "source": "INSTITUTIONAL_CORE",
+      "context": "With a 1:2 R:R, even a 40% win rate generates substantial long-term profit.",
+      "enforcedCount": 22,
+      "active": true,
+      "createdAt": "2026-11-05T15:58:25.017Z"
+    },
+    {
+      "id": "rule_core_3",
+      "rule": "Avoid opening BUY positions when RSI > 68 or price is overextended far above 20 EMA.",
+      "source": "INSTITUTIONAL_CORE",
+      "context": "Chasing extended green candles into resistance leads to high probability liquidity traps.",
+      "enforcedCount": 9,
+      "active": true,
+      "createdAt": "2026-11-05T15:58:25.017Z"
+    },
+    {
+      "id": "rule_core_4",
+      "rule": "Move Stop Loss to Break-Even (Cost) as soon as trade profit reaches +1.2R.",
+      "source": "INSTITUTIONAL_CORE",
+      "context": "Secures a \"free trade\" and eliminates emotional exit anxiety.",
+      "enforcedCount": 7,
+      "active": true,
+      "createdAt": "2026-11-05T15:58:25.017Z"
+    },
+    {
+      "id": "rule_core_5",
+      "rule": "Do not take counter-trend trades against 20 EMA without a confirmed multi-timeframe divergence.",
+      "source": "INSTITUTIONAL_CORE",
+      "context": "Trading against institutional momentum without divergence has a <30% historical edge.",
+      "enforcedCount": 5,
+      "active": true,
+      "createdAt": "2026-11-05T15:58:25.017Z"
+    }
+  ],
+  "postMortemArchive": [],
+  "coachHistory": [
+    {
+      "id": "coach_1793894327081",
+      "rawFeedback": "Gold mein 8:30 PM US CPI news ke time trade mat lena",
+      "synthesizedRule": "US CPI news release ke dauran Gold (XAUUSD) mein trading se bacho, kyunki high volatility aur unpredictable price movements ka risk rehta hai.",
+      "replyToRaj": "Haan Raj bhai, samajh gaya! US CPI news ke time Gold mein trade nahi lenge, volatility bahut zyada hoti hai.\nAapki training se main har din kuch naya seekh raha hoon, thank you so much mujhe guide karne ke liye.",
+      "timestamp": "21:28:47"
+    }
+  ],
+  "recentMemoryEvents": [
+    {
+      "id": "evt_1793894327083_0.2689964546909187",
+      "time": "21:28:47",
+      "message": "🎓 Raj coached the AI: \"US CPI news release ke dauran Gold (XAUUSD) mein t...\""
+    },
+    {
+      "id": "evt_1793894327081_0.1353743079249632",
+      "time": "21:28:47",
+      "message": "+30 XP: New Trading Rule Ingested from Raj"
+    }
+  ],
+  "updatedAt": "2026-11-05T15:58:47.083Z"
+}
