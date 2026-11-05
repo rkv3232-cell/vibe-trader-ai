@@ -537,9 +537,11 @@ app.delete('/api/bot/rule/:id', (req, res) => {
 // Production: Serve static built frontend from /dist for 24/7 Cloud Hosting
 if (fs.existsSync(DIST_DIR)) {
   app.use(express.static(DIST_DIR));
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) return next();
-    res.sendFile(path.join(DIST_DIR, 'index.html'));
+  app.use((req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api')) {
+      return res.sendFile(path.join(DIST_DIR, 'index.html'));
+    }
+    next();
   });
 }
 
