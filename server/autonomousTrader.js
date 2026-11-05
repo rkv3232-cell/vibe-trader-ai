@@ -294,9 +294,14 @@ export class AutonomousTrader {
       : (pos.entryPrice - currentPrice);
 
     // Calculate profit/loss relative to risk
-    const pointValue = pos.riskAmount / Math.abs(pos.entryPrice - pos.stopLoss);
-    pos.unrealizedPnL = Number((priceDiff * pointValue).toFixed(2));
-    pos.unrealizedPnLPct = Number(((priceDiff / pos.entryPrice) * 100).toFixed(2));
+    const slDiff = Math.abs(pos.entryPrice - pos.stopLoss);
+    const pointValue = (pos.riskAmount && slDiff > 0)
+      ? pos.riskAmount / slDiff
+      : 100;
+    const calcPnL = Number((priceDiff * pointValue).toFixed(2));
+    pos.unrealizedPnL = isNaN(calcPnL) ? 0 : calcPnL;
+    const calcPct = Number(((priceDiff / (pos.entryPrice || 1)) * 100).toFixed(2));
+    pos.unrealizedPnLPct = isNaN(calcPct) ? 0 : calcPct;
 
     // A. Check Take Profit (1:2 R:R WIN)
     const isTargetHit = pos.type === 'BUY'
@@ -473,17 +478,23 @@ export class AutonomousTrader {
 
   // Update Equity & Drawdown metrics
   updateWalletEquity() {
-    const unPnL = this.activePosition ? this.activePosition.unrealizedPnL : 0;
+    const unPnL = (this.activePosition && !isNaN(this.activePosition.unrealizedPnL))
+      ? Number(this.activePosition.unrealizedPnL)
+      : 0;
     this.wallet.unrealizedPnL = unPnL;
-    this.wallet.equity = Number((this.wallet.balance + unPnL).toFixed(2));
+    const balance = !isNaN(this.wallet.balance) ? Number(this.wallet.balance) : 100000;
+    this.wallet.balance = balance;
+    this.wallet.equity = Number((balance + unPnL).toFixed(2));
 
-    if (this.wallet.equity > this.wallet.peakEquity) {
+    if (!this.wallet.peakEquity || this.wallet.equity > this.wallet.peakEquity) {
       this.wallet.peakEquity = this.wallet.equity;
     }
 
-    const dd = ((this.wallet.peakEquity - this.wallet.equity) / this.wallet.peakEquity) * 100;
-    if (dd > this.wallet.maxDrawdownPct) {
-      this.wallet.maxDrawdownPct = Number(dd.toFixed(2));
+    if (this.wallet.peakEquity > 0) {
+      const dd = ((this.wallet.peakEquity - this.wallet.equity) / this.wallet.peakEquity) * 100;
+      if (dd > (this.wallet.maxDrawdownPct || 0)) {
+        this.wallet.maxDrawdownPct = Number(dd.toFixed(2));
+      }
     }
   }
 

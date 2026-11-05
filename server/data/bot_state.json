@@ -1,36 +1,90 @@
 {
   "wallet": {
     "initialCapital": 100000,
-    "balance": 100000,
-    "equity": 100175.49,
-    "realizedPnL": 0,
-    "unrealizedPnL": 175.49,
-    "winCount": 0,
+    "balance": 102000,
+    "equity": 102035.79,
+    "realizedPnL": 2000,
+    "unrealizedPnL": 35.79,
+    "winCount": 1,
     "lossCount": 0,
-    "totalTrades": 0,
-    "winRate": 0,
-    "peakEquity": 100417.65,
+    "totalTrades": 1,
+    "winRate": 100,
+    "peakEquity": null,
     "maxDrawdownPct": 0.5
   },
   "activePosition": {
-    "id": "trade_1793894606124",
+    "id": "trade_1793895778922",
     "symbol": "PAXGUSDT",
     "assetName": "Gold (PAXG/USD)",
     "type": "BUY",
-    "entryPrice": 4080.66,
-    "currentPrice": 4082.45,
-    "stopLoss": 4070.46,
-    "targetPrice": 4101.06,
-    "riskAmount": 1000,
-    "targetProfit": 2000,
-    "unrealizedPnL": 175.49,
-    "unrealizedPnLPct": 0.04,
+    "entryPrice": 4104.47,
+    "currentPrice": 4104.83,
+    "stopLoss": 4094.21,
+    "targetPrice": 4124.99,
+    "riskAmount": 1020,
+    "targetProfit": 2040,
+    "unrealizedPnL": 35.79,
+    "unrealizedPnLPct": 0.01,
     "isTrailingActive": false,
-    "openedAt": "21:33:26"
+    "openedAt": "21:52:58"
   },
-  "tradeHistory": [],
+  "tradeHistory": [
+    {
+      "id": "trade_1793894606124",
+      "symbol": "PAXGUSDT",
+      "assetName": "Gold (PAXG/USD)",
+      "type": "BUY",
+      "entryPrice": 4080.66,
+      "exitPrice": 4101.56,
+      "stopLoss": 4080.66,
+      "targetPrice": 4101.06,
+      "riskReward": "1:2.0",
+      "pnl": 2000,
+      "pnlFormatted": "+₹2000",
+      "isWin": true,
+      "reason": "TARGET_HIT",
+      "openedAt": "21:33:26",
+      "closedAt": "21:51:34"
+    }
+  ],
   "activeAssetKey": "XAUUSD",
   "logs": [
+    {
+      "time": "21:52:58",
+      "category": "ORDER",
+      "message": "🚀 EXECUTED VIRTUAL BUY: Gold (PAXG/USD) @ 4104.47 | SL: 4094.21 | Target: 4124.99 (1:2 R:R, Max Risk: ₹1020)",
+      "id": 1793895778923.5288
+    },
+    {
+      "time": "21:52:52",
+      "category": "MIND",
+      "message": "Watching Gold (PAXG/USD) at 4104.62. 20 EMA: 4100.96 | RSI: 66.7.",
+      "id": 1793895772925.3416
+    },
+    {
+      "time": "21:52:10",
+      "category": "MIND",
+      "message": "Watching Gold (PAXG/USD) at 4100.63. 20 EMA: 4098.39 | RSI: 70.9.",
+      "id": 1793895730891.5195
+    },
+    {
+      "time": "21:51:38",
+      "category": "MEMORY",
+      "message": "🧠 Lesson Memorized: \"*   **Golden Lesson:** Jab trend clear ho aur target set ho,\"",
+      "id": 1793895698720.3958
+    },
+    {
+      "time": "21:51:34",
+      "category": "WIN",
+      "message": "🎉 TARGET HIT! Booked +₹2000 profit on PAXGUSDT at 4101.56. 1:2 R:R achieved!",
+      "id": 1793895694600.4702
+    },
+    {
+      "time": "21:49:34",
+      "category": "TRAIL_SL",
+      "message": "🛡️ Trailing Stop Loss moved to Cost (4080.66). Zero risk on this trade!",
+      "id": 1793895574404.475
+    },
     {
       "time": "21:33:26",
       "category": "ORDER",
@@ -56,5 +110,5 @@
       "id": 1793894555530.129
     }
   ],
-  "updatedAt": "2026-11-05T16:10:27.166Z"
+  "updatedAt": "2026-11-05T16:31:12.559Z"
 }

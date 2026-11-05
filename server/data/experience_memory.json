@@ -1,9 +1,9 @@
 {
-  "xp": 210,
+  "xp": 245,
   "level": 1,
   "levelTitle": "Level 1: Novice Quant Paper Trader 🚀",
-  "winStreak": 0,
-  "bestStreak": 0,
+  "winStreak": 1,
+  "bestStreak": 1,
   "totalLessonsLearned": 6,
   "learnedRules": [
     {
@@ -61,7 +61,24 @@
       "createdAt": "2026-11-05T15:58:25.017Z"
     }
   ],
-  "postMortemArchive": [],
+  "postMortemArchive": [
+    {
+      "id": "postmortem_1793895698667",
+      "tradeId": "trade_1793894606124",
+      "symbol": "PAXGUSDT",
+      "assetName": "Gold (PAXG/USD)",
+      "type": "BUY",
+      "entryPrice": 4080.66,
+      "exitPrice": 4101.56,
+      "pnl": 2000,
+      "pnlFormatted": "+₹2000",
+      "isWin": true,
+      "reason": "TARGET_HIT",
+      "reflection": "*   **Post-Mortem:** Target hit hua matlab apni bullish analysis sahi thi aur market ne expected move diya, isliye profit hua.\n*   **Golden Lesson:** Jab trend clear ho aur target set ho, toh uspar bharosa rakho.",
+      "lesson": "*   **Golden Lesson:** Jab trend clear ho aur target set ho, toh uspar bharosa rakho.",
+      "closedAt": "21:51:34"
+    }
+  ],
   "coachHistory": [
     {
       "id": "coach_1793894327081",
@@ -73,6 +90,16 @@
   ],
   "recentMemoryEvents": [
     {
+      "id": "evt_1793895698668_0.4813009343857133",
+      "time": "21:51:38",
+      "message": "🧠 Post-Mortem saved for PAXGUSDT: \"*   **Golden Lesson:** Jab trend clear ho aur target set ho,...\""
+    },
+    {
+      "id": "evt_1793895694607_0.08587823377190196",
+      "time": "21:51:34",
+      "message": "+35 XP: Target 1:2 Hit on PAXGUSDT"
+    },
+    {
       "id": "evt_1793894327083_0.2689964546909187",
       "time": "21:28:47",
       "message": "🎓 Raj coached the AI: \"US CPI news release ke dauran Gold (XAUUSD) mein t...\""
@@ -83,5 +110,5 @@
       "message": "+30 XP: New Trading Rule Ingested from Raj"
     }
   ],
-  "updatedAt": "2026-11-05T15:58:47.083Z"
+  "updatedAt": "2026-11-05T16:21:38.668Z"
 }
