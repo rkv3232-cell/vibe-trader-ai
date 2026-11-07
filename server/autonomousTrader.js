@@ -223,12 +223,29 @@ export class AutonomousTrader {
     }
   }
 
-  // Fetch real live price with Multi-Tier Institutional Providers (Coinbase -> Kraken -> Binance)
+  // Fetch real live price with Multi-Tier Institutional Providers (Binance Vision -> Coinbase -> Kraken)
   async fetchLivePrice() {
     const asset = this.assets[this.activeAssetKey];
     if (!asset) return this.livePrice;
 
-    // 1. Try Coinbase Public Spot API (Fastest, global, never blocked on US/cloud servers)
+    // 1. Try Binance Vision Global Public Data API (Matches TradingView Binance chart 100% & zero IP blocks)
+    try {
+      const url = `https://data-api.binance.vision/api/v3/ticker/price?symbol=${asset.symbol}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const data = await res.json();
+        const price = parseFloat(data.price);
+        if (!isNaN(price) && price > 0) {
+          this.livePrice = Number(price.toFixed(asset.decimals));
+          this.recordTick(this.livePrice);
+          return this.livePrice;
+        }
+      }
+    } catch (e) {
+      // Fall through to Coinbase
+    }
+
+    // 2. Try Coinbase Public Spot API (Fastest global US fallback)
     if (asset.coinbasePair) {
       try {
         const url = `https://api.coinbase.com/v2/prices/${asset.coinbasePair}/spot`;
@@ -247,7 +264,7 @@ export class AutonomousTrader {
       }
     }
 
-    // 2. Try Kraken Public Ticker API (Institutional global failover)
+    // 3. Try Kraken Public Ticker API (Institutional global failover)
     if (asset.krakenPair) {
       try {
         const url = `https://api.kraken.com/0/public/Ticker?pair=${asset.krakenPair}`;
@@ -263,11 +280,11 @@ export class AutonomousTrader {
           }
         }
       } catch (e) {
-        // Fall through to Binance
+        // Fall through to Binance Direct
       }
     }
 
-    // 3. Try Binance Public API (Direct / Global)
+    // 4. Try Binance Direct Public API
     try {
       const url = `https://api.binance.com/api/v3/ticker/price?symbol=${asset.symbol}`;
       const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
@@ -290,6 +307,28 @@ export class AutonomousTrader {
   // Multi-Market Institutional Radar: Polls live spot prices across all 4 markets
   async updateMarketRadar() {
     for (const [key, asset] of Object.entries(this.assets)) {
+      // 1. Try Binance Vision
+      try {
+        const url = `https://data-api.binance.vision/api/v3/ticker/price?symbol=${asset.symbol}`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(2500) });
+        if (res.ok) {
+          const data = await res.json();
+          const p = parseFloat(data.price);
+          if (!isNaN(p) && p > 0) {
+            this.marketRadar[key] = {
+              key,
+              name: asset.name.split(' ')[0],
+              symbol: asset.symbol,
+              price: Number(p.toFixed(asset.decimals))
+            };
+            continue;
+          }
+        }
+      } catch (e) {
+        // Fall through to Coinbase
+      }
+
+      // 2. Fallback to Coinbase
       if (asset.coinbasePair) {
         try {
           const url = `https://api.coinbase.com/v2/prices/${asset.coinbasePair}/spot`;
