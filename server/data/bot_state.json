@@ -1,10 +1,11 @@
 {
+  "isRunning": true,
   "wallet": {
     "initialCapital": 100000,
     "balance": 102000,
-    "equity": 102035.79,
+    "equity": 101855.85,
     "realizedPnL": 2000,
-    "unrealizedPnL": 35.79,
+    "unrealizedPnL": -144.15,
     "winCount": 1,
     "lossCount": 0,
     "totalTrades": 1,
@@ -18,13 +19,13 @@
     "assetName": "Gold (PAXG/USD)",
     "type": "BUY",
     "entryPrice": 4104.47,
-    "currentPrice": 4104.83,
+    "currentPrice": 4103.02,
     "stopLoss": 4094.21,
     "targetPrice": 4124.99,
     "riskAmount": 1020,
     "targetProfit": 2040,
-    "unrealizedPnL": 35.79,
-    "unrealizedPnLPct": 0.01,
+    "unrealizedPnL": -144.15,
+    "unrealizedPnLPct": -0.04,
     "isTrailingActive": false,
     "openedAt": "21:52:58"
   },
@@ -110,5 +111,5 @@
       "id": 1793894555530.129
     }
   ],
-  "updatedAt": "2026-11-05T16:31:12.559Z"
+  "updatedAt": "2026-11-05T16:31:30.544Z"
 }

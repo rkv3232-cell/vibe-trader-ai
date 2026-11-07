@@ -547,4 +547,21 @@ if (fs.existsSync(DIST_DIR)) {
 
 app.listen(PORT, () => {
   console.log(`🚀 VibeTrader AI Backend running on http://localhost:${PORT}`);
+
+  // 24/7 Anti-Sleep Keep-Alive: Ping self every 8 minutes so Render free tier NEVER sleeps!
+  const publicUrl = process.env.RENDER_EXTERNAL_URL || 'https://vibe-trader-ai.onrender.com';
+  if (publicUrl) {
+    console.log(`⚡ 24/7 Keep-Alive Service initialized for: ${publicUrl}`);
+    setInterval(async () => {
+      try {
+        const pingUrl = `${publicUrl}/api/bot/state`;
+        const res = await fetch(pingUrl, { signal: AbortSignal.timeout(6000) });
+        if (res.ok) {
+          console.log(`[KEEP-ALIVE] Pinged ${pingUrl} at ${new Date().toLocaleTimeString('en-IN')} - 24/7 Render Awake!`);
+        }
+      } catch (e) {
+        // Silent ignore
+      }
+    }, 8 * 60 * 1000); // 8 minutes (Render sleeps after 15 mins)
+  }
 });

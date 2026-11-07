@@ -75,13 +75,14 @@ export class AutonomousTrader {
     this.priceTicks = [];
 
     // Load persisted state if available
-    this.wasRunning = false;
+    this.wasRunning = true;
     this.loadState();
 
-    if (this.wasRunning || process.env.AUTO_START_BOT === 'true') {
+    // Auto-start 24/7 Autopilot immediately on boot
+    if (this.wasRunning !== false && process.env.AUTO_START_BOT !== 'false') {
       setTimeout(() => {
         if (!this.isRunning) this.start();
-      }, 1500);
+      }, 1000);
     }
 
     this.addLog('SYSTEM', 'Autonomous Human Trader Engine initialized. Ready to trade 24/7.');
@@ -98,7 +99,11 @@ export class AutonomousTrader {
       if (fs.existsSync(STATE_FILE)) {
         const raw = fs.readFileSync(STATE_FILE, 'utf-8');
         const data = JSON.parse(raw);
-        if (typeof data.isRunning === 'boolean') this.wasRunning = data.isRunning;
+        if (typeof data.isRunning === 'boolean') {
+          this.wasRunning = data.isRunning;
+        } else {
+          this.wasRunning = true;
+        }
         if (data.wallet) this.wallet = { ...this.wallet, ...data.wallet };
         if (data.activePosition !== undefined) this.activePosition = data.activePosition;
         if (Array.isArray(data.tradeHistory)) this.tradeHistory = data.tradeHistory;
@@ -206,10 +211,12 @@ export class AutonomousTrader {
 
   // Start 24/7 Autonomous Bot
   start() {
-    if (this.isRunning) return;
+    if (this.isRunning && this.intervalId) return;
     this.isRunning = true;
+    this.wasRunning = true;
     this.addLog('SYSTEM', `🟢 24/7 Autonomous Human Trader STARTED on ${this.assets[this.activeAssetKey].name}.`);
     this.latestAnnouncement = `Raj bhai, maine 24/7 autonomous paper trading start kar di hai. Capital safe rakh kar 1 is to 2 target par kaam karunga.`;
+    this.saveState();
 
     // Run immediately once
     this.executeTradingCycle();
@@ -223,6 +230,7 @@ export class AutonomousTrader {
   // Stop / Pause Autonomous Bot
   stop() {
     this.isRunning = false;
+    this.wasRunning = false;
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
