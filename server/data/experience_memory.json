@@ -47,7 +47,7 @@
       "rule": "US CPI news release ke dauran Gold (XAUUSD) mein trading se bacho, kyunki high volatility aur unpredictable price movements ka risk rehta hai.",
       "source": "TRAINED_BY_RAJ",
       "context": "Directly coached by Raj: \"Gold mein 8:30 PM US CPI news ke time trade mat lena\"",
-      "enforcedCount": 0,
+      "enforcedCount": 1,
       "active": true,
       "createdAt": "2026-11-05T15:58:47.081Z"
     },
@@ -157,5 +157,6 @@
       "time": "21:51:34",
       "message": "+35 XP: Target 1:2 Hit on PAXGUSDT"
     }
-  ]
+  ],
+  "updatedAt": "2026-11-07T15:02:50.761Z"
 }

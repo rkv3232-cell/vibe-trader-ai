@@ -11,17 +11,9 @@
     "totalTrades": 1,
     "winRate": 100,
     "peakEquity": 102000,
-    "maxDrawdownPct": 0.0
+    "maxDrawdownPct": 0
   },
   "activePosition": null,
-  "dailyStats": {
-    "date": "2026-11-07",
-    "tradesCount": 0,
-    "lossCount": 0,
-    "winCount": 0,
-    "realizedPnL": 0,
-    "circuitBreakerTripped": false
-  },
   "tradeHistory": [
     {
       "id": "trade_1793894606124",
@@ -42,7 +34,33 @@
     }
   ],
   "activeAssetKey": "XAUUSD",
+  "dailyStats": {
+    "date": "2026-11-07",
+    "tradesCount": 0,
+    "lossCount": 0,
+    "winCount": 0,
+    "realizedPnL": 0,
+    "circuitBreakerTripped": false
+  },
   "logs": [
+    {
+      "time": "20:32:50",
+      "category": "MEMORY_GATE",
+      "message": "🛡️ Setup avoided by Learned Rule: Rule Enforced [TRAINED_BY_RAJ]: \"US CPI news release ke dauran Gold (XAUUSD) mein trading se bacho, kyunki high volatility aur unpredictable price movements ka risk rehta hai.\" (US High Volatility News Window Active)",
+      "id": 1794063770762.6477
+    },
+    {
+      "time": "20:32:49",
+      "category": "SYSTEM",
+      "message": "🟢 24/7 Autonomous Human Trader STARTED on Gold (PAXG/USD).",
+      "id": 1794063769895.5725
+    },
+    {
+      "time": "20:32:48",
+      "category": "SYSTEM",
+      "message": "Autonomous Human Trader Engine initialized. Ready to trade 24/7.",
+      "id": 1794063768885.0806
+    },
     {
       "time": "17:10:00",
       "category": "SYSTEM",
@@ -56,5 +74,5 @@
       "id": 1794052185000
     }
   ],
-  "updatedAt": "2026-11-07T11:45:00.000Z"
+  "updatedAt": "2026-11-07T15:03:02.610Z"
 }

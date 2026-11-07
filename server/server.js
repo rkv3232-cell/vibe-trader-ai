@@ -489,9 +489,14 @@ app.post('/api/bot/set-asset', (req, res) => {
 });
 
 // POST Close Current Open Trade manually at market
-app.post('/api/bot/close-position', (req, res) => {
+app.post('/api/bot/close-position', async (req, res) => {
   if (autonomousBot.activePosition) {
-    autonomousBot.closePosition('MANUAL_CLOSE', autonomousBot.livePrice);
+    const pos = autonomousBot.activePosition;
+    const posAssetKey = pos.assetKey || autonomousBot.activeAssetKey;
+    const exitPrice = (posAssetKey === autonomousBot.activeAssetKey)
+      ? autonomousBot.livePrice
+      : await autonomousBot.fetchPriceForAsset(posAssetKey);
+    autonomousBot.closePosition('MANUAL_CLOSE', exitPrice);
   }
   res.json({ success: true, state: autonomousBot.getState() });
 });

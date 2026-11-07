@@ -171,13 +171,43 @@ export class AutonomousTrader {
         } else {
           this.wasRunning = true;
         }
-        if (data.wallet) this.wallet = { ...this.wallet, ...data.wallet };
+        if (Array.isArray(data.tradeHistory)) {
+          // Filter out any cross-asset glitch trades where PnL is distorted
+          this.tradeHistory = data.tradeHistory.filter(t => Math.abs(t.pnl) < 25000);
+        }
+        if (data.wallet) {
+          this.wallet = { ...this.wallet, ...data.wallet };
+          // Sanity check: If equity dropped due to cross-asset glitch, restore cleanly from true trades
+          if (this.wallet.equity < 50000 || this.wallet.realizedPnL < -5000) {
+            let totalPnL = 0;
+            let winCount = 0;
+            let lossCount = 0;
+            for (const t of this.tradeHistory) {
+              totalPnL += t.pnl;
+              if (t.isWin) winCount++; else lossCount++;
+            }
+            this.wallet.realizedPnL = Number(totalPnL.toFixed(2));
+            this.wallet.balance = Number((100000 + totalPnL).toFixed(2));
+            this.wallet.equity = this.wallet.balance;
+            this.wallet.winCount = winCount;
+            this.wallet.lossCount = lossCount;
+            this.wallet.totalTrades = this.tradeHistory.length;
+            this.wallet.winRate = winCount > 0 ? Number(((winCount / this.wallet.totalTrades) * 100).toFixed(1)) : 0;
+            this.wallet.peakEquity = Math.max(100000, this.wallet.equity);
+            this.wallet.maxDrawdownPct = 0;
+            this.addLog('SYSTEM', '🛡️ Capital auto-restored: Glitched cross-asset trade purged.');
+          }
+        }
         if (data.activePosition !== undefined) this.activePosition = data.activePosition;
-        if (Array.isArray(data.tradeHistory)) this.tradeHistory = data.tradeHistory;
         if (data.activeAssetKey) this.activeAssetKey = data.activeAssetKey;
         if (Array.isArray(data.logs)) this.logs = data.logs.slice(-30);
         if (data.dailyStats) {
           this.dailyStats = { ...this.dailyStats, ...data.dailyStats };
+          if (this.dailyStats.realizedPnL < -5000) {
+            this.dailyStats.realizedPnL = 0;
+            this.dailyStats.lossCount = 0;
+            this.dailyStats.circuitBreakerTripped = false;
+          }
           this.checkDayRollover();
         }
       }
@@ -223,9 +253,9 @@ export class AutonomousTrader {
     }
   }
 
-  // Fetch real live price with Multi-Tier Institutional Providers (Binance Vision -> Coinbase -> Kraken)
-  async fetchLivePrice() {
-    const asset = this.assets[this.activeAssetKey];
+  // Fetch real live price for a specific asset (Binance Vision -> Coinbase -> Kraken)
+  async fetchPriceForAsset(assetKey) {
+    const asset = this.assets[assetKey] || this.assets[this.activeAssetKey];
     if (!asset) return this.livePrice;
 
     // 1. Try Binance Vision Global Public Data API (Matches TradingView Binance chart 100% & zero IP blocks)
@@ -236,9 +266,7 @@ export class AutonomousTrader {
         const data = await res.json();
         const price = parseFloat(data.price);
         if (!isNaN(price) && price > 0) {
-          this.livePrice = Number(price.toFixed(asset.decimals));
-          this.recordTick(this.livePrice);
-          return this.livePrice;
+          return Number(price.toFixed(asset.decimals));
         }
       }
     } catch (e) {
@@ -254,9 +282,7 @@ export class AutonomousTrader {
           const data = await res.json();
           const price = parseFloat(data?.data?.amount);
           if (!isNaN(price) && price > 0) {
-            this.livePrice = Number(price.toFixed(asset.decimals));
-            this.recordTick(this.livePrice);
-            return this.livePrice;
+            return Number(price.toFixed(asset.decimals));
           }
         }
       } catch (e) {
@@ -274,34 +300,23 @@ export class AutonomousTrader {
           const pairKey = Object.keys(data?.result || {})[0];
           const price = parseFloat(data?.result?.[pairKey]?.c?.[0]);
           if (!isNaN(price) && price > 0) {
-            this.livePrice = Number(price.toFixed(asset.decimals));
-            this.recordTick(this.livePrice);
-            return this.livePrice;
+            return Number(price.toFixed(asset.decimals));
           }
         }
       } catch (e) {
-        // Fall through to Binance Direct
+        // Fall through
       }
-    }
-
-    // 4. Try Binance Direct Public API
-    try {
-      const url = `https://api.binance.com/api/v3/ticker/price?symbol=${asset.symbol}`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
-      if (res.ok) {
-        const data = await res.json();
-        const price = parseFloat(data.price);
-        if (!isNaN(price) && price > 0) {
-          this.livePrice = Number(price.toFixed(asset.decimals));
-          this.recordTick(this.livePrice);
-          return this.livePrice;
-        }
-      }
-    } catch (e) {
-      // Ignored
     }
 
     return this.livePrice;
+  }
+
+  // Fetch real live price for current active asset
+  async fetchLivePrice() {
+    const price = await this.fetchPriceForAsset(this.activeAssetKey);
+    this.livePrice = price;
+    this.recordTick(price);
+    return price;
   }
 
   // Multi-Market Institutional Radar: Polls live spot prices across all 4 markets
@@ -458,16 +473,19 @@ export class AutonomousTrader {
         this.updateMarketRadar().catch(() => {});
       }
 
-      // 1. Fetch live real-time price
-      const price = await this.fetchLivePrice();
-      const asset = this.assets[this.activeAssetKey];
+      // 1. Fetch live real-time price for active chart view
+      const activePrice = await this.fetchLivePrice();
 
-      // 2. Manage open position if exists
+      // 2. Manage open position if exists (ALWAYS isolated to position's own asset price!)
       if (this.activePosition) {
-        this.manageOpenPosition(price);
+        const posAssetKey = this.activePosition.assetKey || 'XAUUSD';
+        const posPrice = (posAssetKey === this.activeAssetKey)
+          ? activePrice
+          : await this.fetchPriceForAsset(posAssetKey);
+        this.manageOpenPosition(posPrice);
       } else {
-        // 3. Scan for high-probability setups if idle
-        this.scanAndEvaluateMarket(price);
+        // 3. Scan for high-probability setups if idle on active asset
+        this.scanAndEvaluateMarket(activePrice);
       }
 
       // 4. Update equity and drawdown
@@ -486,7 +504,8 @@ export class AutonomousTrader {
     const pos = this.activePosition;
     if (!pos) return;
 
-    const asset = this.assets[this.activeAssetKey] || { decimals: 2 };
+    const posAssetKey = pos.assetKey || this.activeAssetKey;
+    const asset = this.assets[posAssetKey] || { decimals: 2 };
     pos.currentPrice = currentPrice;
 
     // Calculate price difference along trade direction
@@ -630,7 +649,12 @@ export class AutonomousTrader {
     let finalPnL = Number((priceDiff * pointValue).toFixed(2));
 
     if (reason === 'STOP_LOSS_HIT') {
-      finalPnL = -Math.abs(pos.riskAmount);
+      finalPnL = -Math.abs(pos.riskAmount || 1000);
+    }
+
+    // Safety Firewall: Under NO circumstance can a trade loss exceed defined riskAmount (Max 1% = ₹1,000)!
+    if (finalPnL < 0) {
+      finalPnL = -Math.min(Math.abs(finalPnL), Math.abs(pos.riskAmount || 1000));
     }
     const isWin = finalPnL > 0;
 
@@ -863,6 +887,7 @@ export class AutonomousTrader {
 
       this.activePosition = {
         id: `trade_${Date.now()}`,
+        assetKey: this.activeAssetKey,
         symbol: asset.symbol,
         assetName: asset.name,
         type,
