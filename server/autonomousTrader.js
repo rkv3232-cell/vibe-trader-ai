@@ -419,6 +419,12 @@ export class AutonomousTrader {
     const ema20 = this.calculateEMA(20);
     const rsi = this.calculateRSI(14);
 
+    // Periodic Continuous AI Market Structure Study (~every 3-4 minutes)
+    this.cycleCounter = (this.cycleCounter || 0) + 1;
+    if (this.cycleCounter % 30 === 0 && this.geminiCaller) {
+      this.runMarketStudy(asset, currentPrice, ema20, rsi);
+    }
+
     // Human thought logs
     if (Math.random() < 0.28) {
       this.addLog('MIND', `Watching ${asset.name} at ${currentPrice}. 20 EMA: ${ema20} | RSI: ${rsi}.`);
@@ -445,6 +451,7 @@ export class AutonomousTrader {
         this.addLog('MEMORY_GATE', `🛡️ Setup avoided by Learned Rule: ${ruleCheck.reason}`);
         return;
       }
+      this.addLog('KNOWLEDGE', `✅ All ${traderMemory.learnedRules.length} learned rules verified. Risk & structure approved.`);
 
       const stopDistance = Number((currentPrice * 0.0025).toFixed(asset.decimals)); // ~0.25% stop
       const targetDistance = Number((stopDistance * this.riskRewardRatio).toFixed(asset.decimals));
@@ -481,6 +488,23 @@ export class AutonomousTrader {
 
       this.latestAnnouncement = `Raj bhai, maine ${asset.name} mein ${currentPrice} par virtual ${type === 'BUY' ? 'Buy' : 'Short'} position open ki hai. Stop loss ${stopLoss} aur target ${targetPrice} rakha hai.`;
       this.saveState();
+    }
+  }
+
+  // Continuous Market Structure Study via Gemini AI
+  async runMarketStudy(asset, price, ema20, rsi) {
+    try {
+      const prompt = `You are VibeTrader AI actively observing live market price action on ${asset.name}.
+Price: ${price}, 20 EMA: ${ema20}, RSI: ${rsi}.
+Write 1 brief insight (Hinglish/English, under 20 words) analyzing current institutional pressure, support/resistance, or breakout potential.`;
+      const reply = await this.geminiCaller([{ role: 'user', content: prompt }]);
+      if (reply) {
+        const cleanInsight = reply.replace(/[*_#]/g, '').trim();
+        this.addLog('STUDY', `📖 Market Structure Study: ${cleanInsight}`);
+        traderMemory.awardXP(10, `Market Structure Study on ${asset.name}`);
+      }
+    } catch (e) {
+      // Ignore network hiccup
     }
   }
 

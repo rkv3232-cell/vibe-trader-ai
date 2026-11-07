@@ -206,8 +206,9 @@ export class TraderMemory {
 
     let reflection = '';
     let lesson = '';
+    let newRuleText = '';
 
-    // Generate AI Self-Reflection
+    // Generate AI Self-Reflection via Gemini
     if (callGeminiFn) {
       try {
         const prompt = `You are the self-reflection cognitive engine of VibeTrader AI, an autonomous paper trader being trained by Raj (a 16yo student).
@@ -219,14 +220,24 @@ A trade just closed:
 - P&L: ₹${pnl} (${isWin ? 'PROFIT' : 'LOSS'})
 - Exit Reason: ${closedTrade.reason}
 
-Reflect on this trade in 2 short bullet points in conversational Hinglish:
-1. "Post-Mortem": Exactly why did this trade succeed or hit SL?
-2. "Golden Lesson": Formulate 1 concise actionable rule so the bot remembers this lesson forever.
-Keep it strictly under 50 words. Do not use generic filler.`;
+Analyze this trade and return ONLY JSON:
+{
+  "reflection": "2 short sentences in natural Hinglish explaining why this trade succeeded or hit SL.",
+  "lesson": "1 crisp golden rule to remember forever (Hinglish/English)."
+}`;
 
         const reply = await callGeminiFn([{ role: 'user', content: prompt }]);
-        reflection = reply.trim();
-        lesson = reply.split('\n').filter(line => line.includes('Lesson') || line.includes('Rule') || line.includes('2.'))[0] || reply.slice(0, 100);
+        const jsonMatch = reply.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          reflection = parsed.reflection;
+          lesson = parsed.lesson;
+          newRuleText = parsed.lesson;
+        } else {
+          reflection = reply.trim();
+          lesson = reply.slice(0, 100);
+          newRuleText = lesson;
+        }
       } catch (err) {
         console.warn('Gemini trade reflection fallback:', err.message);
       }
@@ -236,10 +247,28 @@ Keep it strictly under 50 words. Do not use generic filler.`;
       if (isWin) {
         reflection = `1. Post-Mortem: 20 EMA pullback test succeeded with healthy RSI momentum, hitting 1:2 R:R cleanly.\n2. Golden Lesson: Continue taking high-conviction pullbacks along the primary trend.`;
         lesson = `Take 20 EMA pullbacks with trend confirmation.`;
+        newRuleText = `Pullback Momentum Rule: Enter in trend direction when price holds 20 EMA pullback.`;
       } else {
         reflection = `1. Post-Mortem: Price faced sudden rejection and breached Stop Loss, strictly cutting loss at ₹${Math.abs(pnl)}.\n2. Golden Lesson: Never remove or widen Stop Loss; accept the small loss and wait for cleaner structure.`;
         lesson = `Always respect Stop Loss; never fight sudden counter-trend spikes.`;
+        newRuleText = `Strict Risk Protection: Do not fight sudden counter-trend spikes without divergence.`;
       }
+    }
+
+    // AUTOMATICALLY PROMOTE LESSON INTO PERMANENT LEARNED RULES LEDGER!
+    if (newRuleText && !this.learnedRules.some(r => r.rule.toLowerCase() === newRuleText.toLowerCase())) {
+      const autoRule = {
+        id: `rule_auto_${Date.now()}`,
+        rule: newRuleText,
+        source: 'AUTO_LEARNED',
+        context: `${isWin ? 'Discovered from Winning Trade' : 'Learned from Loss'} on ${closedTrade.symbol} (P&L: ${closedTrade.pnlFormatted})`,
+        enforcedCount: 0,
+        active: true,
+        createdAt: new Date().toISOString()
+      };
+      this.learnedRules.unshift(autoRule);
+      this.totalLessonsLearned = this.learnedRules.length;
+      this.addMemoryEvent(`📜 New Rule Auto-Learned & Active: "${newRuleText.slice(0, 50)}..."`);
     }
 
     const postMortemItem = {
@@ -348,34 +377,88 @@ Only return valid JSON.`;
   checkSetupAgainstRules(candidateSetup) {
     const { type, rsi, price, ema20 } = candidateSetup;
 
-    // Check 1: Overbought buy rule
-    if (type === 'BUY' && rsi > 68) {
-      const rule = this.learnedRules.find(r => r.id === 'rule_core_3' && r.active);
-      if (rule) {
-        rule.enforcedCount = (rule.enforcedCount || 0) + 1;
-        this.saveMemory();
-        return {
-          allowed: false,
-          ruleId: rule.id,
-          reason: `Rejected by Rule: RSI is overbought (${rsi} > 68). Avoid chasing tops.`
-        };
+    // Loop through ALL active learned rules (including Raj's rules and auto-learned rules)
+    for (const ruleObj of this.learnedRules) {
+      if (!ruleObj.active) continue;
+      const text = (ruleObj.rule || '').toLowerCase();
+
+      // Check A: Overbought RSI rules
+      if (type === 'BUY' && (text.includes('rsi') || text.includes('overbought')) && (text.includes('68') || text.includes('70'))) {
+        if (rsi > 68) {
+          ruleObj.enforcedCount = (ruleObj.enforcedCount || 0) + 1;
+          this.saveMemory();
+          return {
+            allowed: false,
+            ruleId: ruleObj.id,
+            reason: `Rule Enforced [${ruleObj.source}]: "${ruleObj.rule}" (RSI ${rsi} is overbought > 68)`
+          };
+        }
       }
-    }
 
-    // Check 2: Oversold sell rule
-    if (type === 'SELL' && rsi < 32) {
-      return {
-        allowed: false,
-        reason: `Rejected by Rule: RSI is oversold (${rsi} < 32). Avoid shorting the very bottom.`
-      };
-    }
+      // Check B: Oversold RSI rules
+      if (type === 'SELL' && (text.includes('rsi') || text.includes('oversold')) && (text.includes('30') || text.includes('32'))) {
+        if (rsi < 32) {
+          ruleObj.enforcedCount = (ruleObj.enforcedCount || 0) + 1;
+          this.saveMemory();
+          return {
+            allowed: false,
+            ruleId: ruleObj.id,
+            reason: `Rule Enforced [${ruleObj.source}]: "${ruleObj.rule}" (RSI ${rsi} is oversold < 32)`
+          };
+        }
+      }
 
-    // Check 3: Extended from EMA
-    if (ema20 && Math.abs(price - ema20) / ema20 > 0.02) {
-      return {
-        allowed: false,
-        reason: `Rejected by Rule: Price is >2% away from 20 EMA. Wait for pullback retest.`
-      };
+      // Check C: Extended from 20 EMA
+      if (text.includes('2%') || text.includes('dur') || text.includes('extended') || text.includes('far')) {
+        if (ema20 && Math.abs(price - ema20) / ema20 > 0.018) {
+          ruleObj.enforcedCount = (ruleObj.enforcedCount || 0) + 1;
+          this.saveMemory();
+          return {
+            allowed: false,
+            ruleId: ruleObj.id,
+            reason: `Rule Enforced [${ruleObj.source}]: "${ruleObj.rule}" (Price extended >1.8% from 20 EMA)`
+          };
+        }
+      }
+
+      // Check D: High-impact News / Volatility restrictions (e.g. CPI news, US Open, 8:30 PM)
+      if (text.includes('cpi') || text.includes('news') || text.includes('volatility')) {
+        const now = new Date();
+        const istHours = (now.getUTCHours() + 5 + Math.floor((now.getUTCMinutes() + 30) / 60)) % 24;
+        const istMins = (now.getUTCMinutes() + 30) % 60;
+        // Check if between 8:25 PM and 8:40 PM IST
+        if (istHours === 20 && istMins >= 25 && istMins <= 40) {
+          ruleObj.enforcedCount = (ruleObj.enforcedCount || 0) + 1;
+          this.saveMemory();
+          return {
+            allowed: false,
+            ruleId: ruleObj.id,
+            reason: `Rule Enforced [${ruleObj.source}]: "${ruleObj.rule}" (US High Volatility News Window Active)`
+          };
+        }
+      }
+
+      // Check E: Counter-trend rules
+      if (text.includes('counter-trend') || text.includes('against 20 ema') || text.includes('counter trend')) {
+        if (type === 'BUY' && price < ema20 * 0.996) {
+          ruleObj.enforcedCount = (ruleObj.enforcedCount || 0) + 1;
+          this.saveMemory();
+          return {
+            allowed: false,
+            ruleId: ruleObj.id,
+            reason: `Rule Enforced [${ruleObj.source}]: "${ruleObj.rule}" (Cannot BUY below 20 EMA downtrend)`
+          };
+        }
+        if (type === 'SELL' && price > ema20 * 1.004) {
+          ruleObj.enforcedCount = (ruleObj.enforcedCount || 0) + 1;
+          this.saveMemory();
+          return {
+            allowed: false,
+            ruleId: ruleObj.id,
+            reason: `Rule Enforced [${ruleObj.source}]: "${ruleObj.rule}" (Cannot SELL above 20 EMA uptrend)`
+          };
+        }
+      }
     }
 
     return { allowed: true };

@@ -2713,7 +2713,7 @@ export default function App() {
                               ? 'text-cyan-400'
                               : log.category === 'TRAIL_SL'
                               ? 'text-indigo-400'
-                              : log.category === 'MEMORY' || log.category === 'MEMORY_GATE'
+                              : log.category === 'MEMORY' || log.category === 'MEMORY_GATE' || log.category === 'KNOWLEDGE' || log.category === 'STUDY'
                               ? 'text-purple-400'
                               : log.category === 'SYSTEM'
                               ? 'text-amber-400'
