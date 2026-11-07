@@ -2523,13 +2523,24 @@ export default function App() {
                 </span>
               </div>
 
-              {/* Capital Risk Standard */}
+              {/* Capital Risk & Daily Circuit Breaker */}
               <div className="p-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800/90 flex flex-col justify-between">
-                <span className="text-[10.5px] text-zinc-400 font-medium">Risk Gate (Jim Simons)</span>
-                <span className="text-sm font-mono font-bold text-indigo-400">
-                  1.0% / Trade
+                <span className="text-[10.5px] text-zinc-400 font-medium flex items-center justify-between">
+                  <span>Risk & Shield</span>
+                  <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                    botState?.dailyStats?.circuitBreakerTripped
+                      ? 'bg-rose-950 text-rose-400 border border-rose-500/50'
+                      : 'bg-indigo-950 text-indigo-300 border border-indigo-500/40'
+                  }`}>
+                    {botState?.dailyStats?.circuitBreakerTripped ? 'Shield Tripped' : 'Shield Active'}
+                  </span>
                 </span>
-                <span className="text-[10px] text-indigo-300">Target 1:2 R:R (Minervini)</span>
+                <span className="text-sm font-mono font-bold text-indigo-400">
+                  1.0% / Trade • Target ₹5k+
+                </span>
+                <span className="text-[10px] text-zinc-400">
+                  Today: {botState?.dailyStats?.tradesCount || 0}/4 trades ({botState?.dailyStats?.lossCount || 0}/2 losses)
+                </span>
               </div>
 
               {/* Live Ticker Price */}
@@ -2659,14 +2670,35 @@ export default function App() {
                             <div className="text-rose-300 font-bold">${botState.activePosition.stopLoss}</div>
                           </div>
                           <div>
-                            <div className="text-[10px] text-emerald-400 font-semibold">Target (1:2)</div>
+                            <div className="text-[10px] text-emerald-400 font-semibold">
+                              {botState.activePosition.trailingStage && botState.activePosition.trailingStage !== 'INITIAL_RISK'
+                                ? 'Next Target'
+                                : 'Target (1:2)'}
+                            </div>
                             <div className="text-emerald-300 font-bold">${botState.activePosition.targetPrice}</div>
                           </div>
                         </div>
 
                         {/* Trailing stop status */}
                         <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-1">
-                          <span>Trailing Stop: {botState.activePosition.isTrailingActive ? '🟢 Breakeven Protected' : 'Pending +1.2R'}</span>
+                          <span className="flex items-center gap-1">
+                            <span className="font-semibold text-zinc-300">Trailing:</span>
+                            <span className={
+                              botState.activePosition.trailingStage === 'TRAIL_5R_PLUS' ? 'text-amber-400 font-bold' :
+                              botState.activePosition.trailingStage === 'TRAIL_4R' ? 'text-purple-400 font-bold' :
+                              botState.activePosition.trailingStage === 'TRAIL_3R' ? 'text-cyan-400 font-bold' :
+                              botState.activePosition.trailingStage === 'TRAIL_2R' ? 'text-emerald-400 font-bold' :
+                              botState.activePosition.trailingStage === 'BREAKEVEN' ? 'text-emerald-300 font-medium' :
+                              'text-zinc-500'
+                            }>
+                              {botState.activePosition.trailingStage === 'TRAIL_5R_PLUS' ? '🏆 Mega Runner (+₹4k locked, hunting ₹5k+)' :
+                               botState.activePosition.trailingStage === 'TRAIL_4R' ? '⚡ Locked +₹3k (Heading for ₹5k+)' :
+                               botState.activePosition.trailingStage === 'TRAIL_3R' ? '🔥 Locked +₹2k (Hunting ₹4k+)' :
+                               botState.activePosition.trailingStage === 'TRAIL_2R' ? '🚀 Locked +₹1.2k (Hunting ₹3k+)' :
+                               botState.activePosition.trailingStage === 'BREAKEVEN' ? '🛡️ Cost Breakeven (Zero Risk)' :
+                               'Pending +1.0R Breakeven'}
+                            </span>
+                          </span>
                           <span>Opened: {botState.activePosition.openedAt}</span>
                         </div>
                       </div>
@@ -2676,11 +2708,17 @@ export default function App() {
                           <Activity className="w-4 h-4 animate-spin" />
                         </div>
                         <div className="text-xs font-semibold text-zinc-200 mb-0.5">
-                          {botState?.isRunning ? 'Scanning Market for 1:2 Setup...' : 'Autopilot Paused'}
+                          {botState?.dailyStats?.circuitBreakerTripped
+                            ? '🛑 Daily Circuit Breaker Active'
+                            : botState?.isRunning
+                            ? 'Scanning Market for 20 EMA Setup (Target ₹4,000–₹5,000+)...'
+                            : 'Autopilot Paused'}
                         </div>
                         <div className="text-[10px] text-zinc-400 max-w-xs">
-                          {botState?.isRunning
-                            ? 'Checking 20 EMA pullback test, RSI momentum & orderbook absorption.'
+                          {botState?.dailyStats?.circuitBreakerTripped
+                            ? 'Max 2 daily losses hit (-₹2,000 risk cap). Capital 100% protected until tomorrow.'
+                            : botState?.isRunning
+                            ? `Checking 20 EMA pullback test, RSI momentum & dynamic runner trailing. Today: ${botState?.dailyStats?.tradesCount || 0}/4 trades.`
                             : 'Click "Start 24/7 Autopilot" to let the bot trade automatically.'}
                         </div>
                       </div>

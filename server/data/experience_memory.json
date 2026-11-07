@@ -1,11 +1,47 @@
 {
-  "xp": 245,
-  "level": 1,
-  "levelTitle": "Level 1: Novice Quant Paper Trader 🚀",
+  "xp": 365,
+  "level": 2,
+  "levelTitle": "Level 2: Discipline Apprentice 🎯",
   "winStreak": 1,
   "bestStreak": 1,
-  "totalLessonsLearned": 6,
+  "totalLessonsLearned": 10,
   "learnedRules": [
+    {
+      "id": "rule_raj_profit_trailing",
+      "rule": "Dynamic Profit Trailing: Ride winning trades beyond 1:2 R:R toward ₹4,000–₹5,000+ using ratcheted trailing stops. Move SL to Break-Even at +1.2R (Zero Risk). Never cut a strong runner prematurely.",
+      "source": "TRAINED_BY_RAJ",
+      "context": "Trained by Raj: 'Agar AI 5000+ kama sakta hai to ham use kyun roken, use kamane denge bas jyada loss nahi lenge.'",
+      "enforcedCount": 0,
+      "active": true,
+      "createdAt": "2026-11-07T11:45:00.000Z"
+    },
+    {
+      "id": "rule_raj_daily_circuit_breaker",
+      "rule": "Daily Loss Circuit Breaker: If 2 consecutive stop losses are hit in a single day (-₹2,000 max drawdown), halt all new trades for the day. Protect capital at all costs.",
+      "source": "TRAINED_BY_RAJ",
+      "context": "Trained by Raj: 'Bas ham jyada loss nahi lenge, capital preservation first.'",
+      "enforcedCount": 0,
+      "active": true,
+      "createdAt": "2026-11-07T11:45:00.000Z"
+    },
+    {
+      "id": "rule_raj_quality_over_quantity",
+      "rule": "Quality Over Quantity: Limit trading to max 3-4 high-conviction trades per day. Only enter on confirmed 20 EMA pullbacks with RSI 45-65.",
+      "source": "TRAINED_BY_RAJ",
+      "context": "Trained by Raj: 'Overtrading se bacho, patient sniper trading karo.'",
+      "enforcedCount": 0,
+      "active": true,
+      "createdAt": "2026-11-07T11:45:00.000Z"
+    },
+    {
+      "id": "rule_raj_prime_windows",
+      "rule": "Prime Institutional Liquidity Windows: Focus Gold & Crypto execution during London (1:30 PM - 5:30 PM IST) and New York (6:30 PM - 11:30 PM IST) session expansions.",
+      "source": "TRAINED_BY_RAJ",
+      "context": "Trained by Raj: 'Institutional volume time par hi clean ₹4,000–₹5,000 trend moves milte hain.'",
+      "enforcedCount": 0,
+      "active": true,
+      "createdAt": "2026-11-07T11:45:00.000Z"
+    },
     {
       "id": "rule_raj_1793894327081",
       "rule": "US CPI news release ke dauran Gold (XAUUSD) mein trading se bacho, kyunki high volatility aur unpredictable price movements ka risk rehta hai.",
@@ -81,6 +117,13 @@
   ],
   "coachHistory": [
     {
+      "id": "coach_raj_master_plan",
+      "rawFeedback": "AI ko 4 se 5 hazaar daily kamane ke liye train karo. Agar 5000+ kama sakta hai to use kamane denge bas jyada loss nahi lenge.",
+      "synthesizedRule": "Dynamic Profit-Trailing Engine (₹4,000–₹5,000+ Target) with Strict Daily ₹2,000 Loss Circuit Breaker.",
+      "replyToRaj": "Raj bhai, aapki master strategy maine apne quant brain mein embed kar li hai! Ab main 1:2 par profit cap nahi karunga, trailing stop se ₹4,000–₹5,000+ tak ride karunga aur daily loss strictly ₹2,000 par band ho jayega.",
+      "timestamp": "17:10:00"
+    },
+    {
       "id": "coach_1793894327081",
       "rawFeedback": "Gold mein 8:30 PM US CPI news ke time trade mat lena",
       "synthesizedRule": "US CPI news release ke dauran Gold (XAUUSD) mein trading se bacho, kyunki high volatility aur unpredictable price movements ka risk rehta hai.",
@@ -90,6 +133,21 @@
   ],
   "recentMemoryEvents": [
     {
+      "id": "evt_levelup_level2",
+      "time": "17:10:00",
+      "message": "🎉 LEVEL UP! Reached Level 2: Discipline Apprentice 🎯 (+120 XP Awarded)"
+    },
+    {
+      "id": "evt_trained_profit_trailing",
+      "time": "17:09:45",
+      "message": "📜 Master Rule Ingested: Dynamic Profit Trailing for ₹4,000–₹5,000+ Target"
+    },
+    {
+      "id": "evt_trained_circuit_breaker",
+      "time": "17:09:30",
+      "message": "🛡️ Master Rule Ingested: Daily Loss Circuit Breaker (-₹2,000 max drawdown)"
+    },
+    {
       "id": "evt_1793895698668_0.4813009343857133",
       "time": "21:51:38",
       "message": "🧠 Post-Mortem saved for PAXGUSDT: \"*   **Golden Lesson:** Jab trend clear ho aur target set ho,...\""
@@ -98,17 +156,6 @@
       "id": "evt_1793895694607_0.08587823377190196",
       "time": "21:51:34",
       "message": "+35 XP: Target 1:2 Hit on PAXGUSDT"
-    },
-    {
-      "id": "evt_1793894327083_0.2689964546909187",
-      "time": "21:28:47",
-      "message": "🎓 Raj coached the AI: \"US CPI news release ke dauran Gold (XAUUSD) mein t...\""
-    },
-    {
-      "id": "evt_1793894327081_0.1353743079249632",
-      "time": "21:28:47",
-      "message": "+30 XP: New Trading Rule Ingested from Raj"
     }
-  ],
-  "updatedAt": "2026-11-05T16:21:38.668Z"
+  ]
 }

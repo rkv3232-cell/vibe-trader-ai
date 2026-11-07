@@ -13,8 +13,44 @@ const __dirname = path.dirname(__filename);
 const DATA_DIR = path.join(__dirname, 'data');
 const MEMORY_FILE = path.join(DATA_DIR, 'experience_memory.json');
 
-// Initial Institutional Knowledge Base (from 24 top quant repositories)
+// Initial Institutional Knowledge Base (from 24 top quant repositories & Raj's Training)
 const DEFAULT_RULES = [
+  {
+    id: 'rule_raj_profit_trailing',
+    rule: 'Dynamic Profit Trailing: Ride winning trades beyond 1:2 R:R toward ₹4,000–₹5,000+ using ratcheted trailing stops. Move SL to Break-Even at +1.2R (Zero Risk). Never cut a strong runner prematurely.',
+    source: 'TRAINED_BY_RAJ',
+    context: 'Trained by Raj: "Agar AI 5000+ kama sakta hai to ham use kyun roken, use kamane denge bas jyada loss nahi lenge."',
+    enforcedCount: 0,
+    active: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'rule_raj_daily_circuit_breaker',
+    rule: 'Daily Loss Circuit Breaker: If 2 consecutive stop losses are hit in a single day (-₹2,000 max drawdown), halt all new trades for the day. Protect capital at all costs.',
+    source: 'TRAINED_BY_RAJ',
+    context: 'Trained by Raj: "Bas ham jyada loss nahi lenge, capital preservation first."',
+    enforcedCount: 0,
+    active: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'rule_raj_quality_over_quantity',
+    rule: 'Quality Over Quantity: Limit trading to max 3-4 high-conviction trades per day. Only enter on confirmed 20 EMA pullbacks with RSI 45-65.',
+    source: 'TRAINED_BY_RAJ',
+    context: 'Trained by Raj: "Overtrading se bacho, patient sniper trading karo."',
+    enforcedCount: 0,
+    active: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'rule_raj_prime_windows',
+    rule: 'Prime Institutional Liquidity Windows: Focus Gold & Crypto execution during London (1:30 PM - 5:30 PM IST) and New York (6:30 PM - 11:30 PM IST) session expansions.',
+    source: 'TRAINED_BY_RAJ',
+    context: 'Trained by Raj: "Institutional volume time par hi clean ₹4,000–₹5,000 trend moves milte hain."',
+    enforcedCount: 0,
+    active: true,
+    createdAt: new Date().toISOString()
+  },
   {
     id: 'rule_core_1',
     rule: 'Never risk more than 1.0% of total account capital on any single trade (Jim Simons Rule).',
@@ -375,12 +411,34 @@ Only return valid JSON.`;
 
   // Pre-Trade Rule Verification: checks if setup violates any learned rules
   checkSetupAgainstRules(candidateSetup) {
-    const { type, rsi, price, ema20 } = candidateSetup;
+    const { type, rsi, price, ema20, dailyLossCount, dailyTradesCount } = candidateSetup;
 
     // Loop through ALL active learned rules (including Raj's rules and auto-learned rules)
     for (const ruleObj of this.learnedRules) {
       if (!ruleObj.active) continue;
       const text = (ruleObj.rule || '').toLowerCase();
+
+      // Check Circuit Breaker: 2 stop losses in a day
+      if ((text.includes('circuit breaker') || text.includes('2 consecutive stop') || text.includes('halt all new')) && (dailyLossCount >= 2)) {
+        ruleObj.enforcedCount = (ruleObj.enforcedCount || 0) + 1;
+        this.saveMemory();
+        return {
+          allowed: false,
+          ruleId: ruleObj.id,
+          reason: `Rule Enforced [${ruleObj.source}]: "${ruleObj.rule}" (2 Daily Losses hit - trading paused to protect capital)`
+        };
+      }
+
+      // Check Overtrading: Max trades limit
+      if ((text.includes('quality over quantity') || text.includes('max 3-4') || text.includes('overtrading')) && (dailyTradesCount >= 4)) {
+        ruleObj.enforcedCount = (ruleObj.enforcedCount || 0) + 1;
+        this.saveMemory();
+        return {
+          allowed: false,
+          ruleId: ruleObj.id,
+          reason: `Rule Enforced [${ruleObj.source}]: "${ruleObj.rule}" (Max 4 trades completed today - sitting on hands)`
+        };
+      }
 
       // Check A: Overbought RSI rules
       if (type === 'BUY' && (text.includes('rsi') || text.includes('overbought')) && (text.includes('68') || text.includes('70'))) {

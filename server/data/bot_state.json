@@ -14,6 +14,14 @@
     "maxDrawdownPct": 0.0
   },
   "activePosition": null,
+  "dailyStats": {
+    "date": "2026-11-07",
+    "tradesCount": 0,
+    "lossCount": 0,
+    "winCount": 0,
+    "realizedPnL": 0,
+    "circuitBreakerTripped": false
+  },
   "tradeHistory": [
     {
       "id": "trade_1793894606124",
@@ -36,65 +44,17 @@
   "activeAssetKey": "XAUUSD",
   "logs": [
     {
-      "time": "21:52:58",
-      "category": "ORDER",
-      "message": "🚀 EXECUTED VIRTUAL BUY: Gold (PAXG/USD) @ 4104.47 | SL: 4094.21 | Target: 4124.99 (1:2 R:R, Max Risk: ₹1020)",
-      "id": 1793895778923.5288
-    },
-    {
-      "time": "21:52:52",
-      "category": "MIND",
-      "message": "Watching Gold (PAXG/USD) at 4104.62. 20 EMA: 4100.96 | RSI: 66.7.",
-      "id": 1793895772925.3416
-    },
-    {
-      "time": "21:52:10",
-      "category": "MIND",
-      "message": "Watching Gold (PAXG/USD) at 4100.63. 20 EMA: 4098.39 | RSI: 70.9.",
-      "id": 1793895730891.5195
-    },
-    {
-      "time": "21:51:38",
-      "category": "MEMORY",
-      "message": "🧠 Lesson Memorized: \"*   **Golden Lesson:** Jab trend clear ho aur target set ho,\"",
-      "id": 1793895698720.3958
-    },
-    {
-      "time": "21:51:34",
-      "category": "WIN",
-      "message": "🎉 TARGET HIT! Booked +₹2000 profit on PAXGUSDT at 4101.56. 1:2 R:R achieved!",
-      "id": 1793895694600.4702
-    },
-    {
-      "time": "21:49:34",
-      "category": "TRAIL_SL",
-      "message": "🛡️ Trailing Stop Loss moved to Cost (4080.66). Zero risk on this trade!",
-      "id": 1793895574404.475
-    },
-    {
-      "time": "21:33:26",
-      "category": "ORDER",
-      "message": "🚀 EXECUTED VIRTUAL BUY: Gold (PAXG/USD) @ 4080.66 | SL: 4070.46 | Target: 4101.06 (1:2 R:R, Max Risk: ₹1000)",
-      "id": 1793894606125.5142
-    },
-    {
-      "time": "21:33:26",
-      "category": "MIND",
-      "message": "Watching Gold (PAXG/USD) at 4080.66. 20 EMA: 4080.66 | RSI: 50.",
-      "id": 1793894606124.977
-    },
-    {
-      "time": "21:33:19",
+      "time": "17:10:00",
       "category": "SYSTEM",
-      "message": "🟢 24/7 Autonomous Human Trader STARTED on Gold (PAXG/USD).",
-      "id": 1793894599017.3857
+      "message": "🟢 24/7 Dynamic Trailing Profit Engine Activated! Target: ₹4,000–₹5,000+ uncapped runners with ₹2,000 Daily Loss Circuit Breaker.",
+      "id": 1794052200000
     },
     {
-      "time": "21:32:35",
-      "category": "RESET",
-      "message": "Virtual Account Reset to ₹1,00,000. Ready for fresh 24/7 compounding.",
-      "id": 1793894555530.129
+      "time": "17:09:45",
+      "category": "KNOWLEDGE",
+      "message": "🧠 Raj's 4 Master Institutional Rules Ingested. AI Leveled Up to Level 2: Discipline Apprentice 🎯",
+      "id": 1794052185000
     }
   ],
-  "updatedAt": "2026-11-05T16:31:30.544Z"
+  "updatedAt": "2026-11-07T11:45:00.000Z"
 }
