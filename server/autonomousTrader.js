@@ -25,12 +25,40 @@ export class AutonomousTrader {
     this.intervalId = null;
     this.cycleSeconds = 6; // Evaluates live market every 6 seconds
 
-    // Supported live assets
+    // Supported live assets with multi-exchange institutional fallback
     this.assets = {
-      XAUUSD: { name: 'Gold (PAXG/USD)', symbol: 'PAXGUSDT', decimals: 2, minMove: 0.1 },
-      BTCUSDT: { name: 'Bitcoin (BTC/USD)', symbol: 'BTCUSDT', decimals: 2, minMove: 1.0 },
-      ETHUSDT: { name: 'Ethereum (ETH/USD)', symbol: 'ETHUSDT', decimals: 2, minMove: 0.5 },
-      SOLUSDT: { name: 'Solana (SOL/USD)', symbol: 'SOLUSDT', decimals: 2, minMove: 0.05 }
+      XAUUSD: {
+        name: 'Gold (PAXG/USD)',
+        symbol: 'PAXGUSDT',
+        coinbasePair: 'PAXG-USD',
+        krakenPair: 'PAXGUSD',
+        decimals: 2,
+        minMove: 0.1
+      },
+      BTCUSDT: {
+        name: 'Bitcoin (BTC/USD)',
+        symbol: 'BTCUSDT',
+        coinbasePair: 'BTC-USD',
+        krakenPair: 'XBTUSD',
+        decimals: 2,
+        minMove: 1.0
+      },
+      ETHUSDT: {
+        name: 'Ethereum (ETH/USD)',
+        symbol: 'ETHUSDT',
+        coinbasePair: 'ETH-USD',
+        krakenPair: 'ETHUSD',
+        decimals: 2,
+        minMove: 0.5
+      },
+      SOLUSDT: {
+        name: 'Solana (SOL/USD)',
+        symbol: 'SOLUSDT',
+        coinbasePair: 'SOL-USD',
+        krakenPair: 'SOLUSD',
+        decimals: 2,
+        minMove: 0.05
+      }
     };
 
     this.activeAssetKey = 'XAUUSD';
@@ -151,14 +179,54 @@ export class AutonomousTrader {
     }
   }
 
-  // Fetch real live price from Binance public API
+  // Fetch real live price with Multi-Tier Institutional Providers (Coinbase -> Kraken -> Binance)
   async fetchLivePrice() {
     const asset = this.assets[this.activeAssetKey];
     if (!asset) return this.livePrice;
 
+    // 1. Try Coinbase Public Spot API (Fastest, global, never blocked on US/cloud servers)
+    if (asset.coinbasePair) {
+      try {
+        const url = `https://api.coinbase.com/v2/prices/${asset.coinbasePair}/spot`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+        if (res.ok) {
+          const data = await res.json();
+          const price = parseFloat(data?.data?.amount);
+          if (!isNaN(price) && price > 0) {
+            this.livePrice = Number(price.toFixed(asset.decimals));
+            this.recordTick(this.livePrice);
+            return this.livePrice;
+          }
+        }
+      } catch (e) {
+        // Fall through to Kraken
+      }
+    }
+
+    // 2. Try Kraken Public Ticker API (Institutional global failover)
+    if (asset.krakenPair) {
+      try {
+        const url = `https://api.kraken.com/0/public/Ticker?pair=${asset.krakenPair}`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+        if (res.ok) {
+          const data = await res.json();
+          const pairKey = Object.keys(data?.result || {})[0];
+          const price = parseFloat(data?.result?.[pairKey]?.c?.[0]);
+          if (!isNaN(price) && price > 0) {
+            this.livePrice = Number(price.toFixed(asset.decimals));
+            this.recordTick(this.livePrice);
+            return this.livePrice;
+          }
+        }
+      } catch (e) {
+        // Fall through to Binance
+      }
+    }
+
+    // 3. Try Binance Public API (Direct / Global)
     try {
       const url = `https://api.binance.com/api/v3/ticker/price?symbol=${asset.symbol}`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(3500) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
       if (res.ok) {
         const data = await res.json();
         const price = parseFloat(data.price);
@@ -168,12 +236,10 @@ export class AutonomousTrader {
           return this.livePrice;
         }
       }
-    } catch (err) {
-      // Fallback: subtle micro-tick price action simulation if network hiccups
-      const delta = (Math.random() - 0.49) * asset.minMove * 1.5;
-      this.livePrice = Number(Math.max(1, this.livePrice + delta).toFixed(asset.decimals));
-      this.recordTick(this.livePrice);
+    } catch (e) {
+      // Ignored
     }
+
     return this.livePrice;
   }
 

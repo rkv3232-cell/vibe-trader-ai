@@ -3,32 +3,17 @@
   "wallet": {
     "initialCapital": 100000,
     "balance": 102000,
-    "equity": 101855.85,
+    "equity": 102000,
     "realizedPnL": 2000,
-    "unrealizedPnL": -144.15,
+    "unrealizedPnL": 0,
     "winCount": 1,
     "lossCount": 0,
     "totalTrades": 1,
     "winRate": 100,
-    "peakEquity": null,
-    "maxDrawdownPct": 0.5
+    "peakEquity": 102000,
+    "maxDrawdownPct": 0.0
   },
-  "activePosition": {
-    "id": "trade_1793895778922",
-    "symbol": "PAXGUSDT",
-    "assetName": "Gold (PAXG/USD)",
-    "type": "BUY",
-    "entryPrice": 4104.47,
-    "currentPrice": 4103.02,
-    "stopLoss": 4094.21,
-    "targetPrice": 4124.99,
-    "riskAmount": 1020,
-    "targetProfit": 2040,
-    "unrealizedPnL": -144.15,
-    "unrealizedPnLPct": -0.04,
-    "isTrailingActive": false,
-    "openedAt": "21:52:58"
-  },
+  "activePosition": null,
   "tradeHistory": [
     {
       "id": "trade_1793894606124",
