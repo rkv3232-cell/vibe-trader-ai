@@ -599,6 +599,22 @@ export class AutonomousTrader {
       this.closePosition('TREND_EXHAUSTION_EXIT', currentPrice);
       return;
     }
+
+    // Check C: Stagnation Profit Harvest (If trade in profit for > 45 minutes during low-volatility dead zone)
+    const openDurationMs = Date.now() - (pos.openedTimestamp || 0);
+    const isStagnantProfit = openDurationMs > 45 * 60 * 1000 && pos.unrealizedPnL >= 250;
+    if (isStagnantProfit) {
+      const recentTicks = this.priceTicks.slice(-20);
+      if (recentTicks.length >= 8) {
+        const minP = Math.min(...recentTicks);
+        const maxP = Math.max(...recentTicks);
+        const rangePct = (maxP - minP) / (minP || 1);
+        if (rangePct < 0.0008) {
+          this.closePosition('STAGNATION_PROFIT_HARVEST', currentPrice);
+          return;
+        }
+      }
+    }
   }
 
   // Close an active position
@@ -671,7 +687,10 @@ export class AutonomousTrader {
     }
 
     if (isWin) {
-      if (finalPnL >= 4000) {
+      if (reason === 'STAGNATION_PROFIT_HARVEST') {
+        this.addLog('HARVEST', `🛡️ Stagnation Harvest: Booked +₹${finalPnL} on ${pos.symbol} after market chop. Freeing capital for active momentum.`);
+        this.latestAnnouncement = `Raj bhai, slow market mein maine safely ₹${finalPnL} profit book kar liya hai. Ab hum fresh high-momentum setup hunt kar rahe hain.`;
+      } else if (finalPnL >= 4000) {
         this.addLog('WIN', `🏆 MEGA RUNNER WINNER! Booked +₹${finalPnL} on ${pos.symbol} (${riskReward} R:R) with Dynamic Profit Trailing!`);
         this.latestAnnouncement = `Shaandaar Raj bhai! Uncapped trailing runner ne ₹${finalPnL} ka zabardast profit book kiya hai!`;
       } else if (finalPnL >= 2000) {
@@ -771,7 +790,26 @@ export class AutonomousTrader {
       }
       this.addLog('KNOWLEDGE', `✅ All ${traderMemory.learnedRules.length} learned rules verified. Risk & structure approved.`);
 
-      const stopDistance = Number((currentPrice * 0.0025).toFixed(asset.decimals)); // ~0.25% stop
+      const now = new Date();
+      const istDay = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay();
+      const isWeekend = (istDay === 0 || istDay === 6); // 0 = Sunday, 6 = Saturday
+
+      // Adaptive Volatility Scalp Sizing:
+      // Gold on weekend uses tighter 0.0012 (~$4.80) so small moves hit big targets 2.5x faster!
+      // Bitcoin uses 0.0035, Solana 0.0045 for healthy breathing space.
+      let stopPct = 0.0025;
+      if (this.activeAssetKey === 'XAUUSD' && isWeekend) {
+        stopPct = 0.0012; // 0.12% precision scalp for weekend gold (~$4.80)
+      } else if (this.activeAssetKey === 'BTCUSDT') {
+        stopPct = 0.0035;
+      } else if (this.activeAssetKey === 'SOLUSDT') {
+        stopPct = 0.0045;
+      }
+
+      const stopDistance = Math.max(
+        Number((currentPrice * stopPct).toFixed(asset.decimals)),
+        asset.minMove * 10
+      );
       const pointValue = Number((riskAmount / stopDistance).toFixed(4));
       const targetDistance = Number((stopDistance * this.riskRewardRatio).toFixed(asset.decimals));
 
@@ -803,7 +841,6 @@ export class AutonomousTrader {
       }
 
       // 3. Institutional Session Window (+20 pts)
-      const now = new Date();
       const istHour = (now.getUTCHours() + 5 + Math.floor((now.getUTCMinutes() + 30) / 60)) % 24;
       const isInstitutionalSession = (istHour >= 13 && istHour <= 17) || (istHour >= 18 && istHour <= 23);
       if (isInstitutionalSession) {
@@ -846,6 +883,7 @@ export class AutonomousTrader {
         setupGrade,
         confluences,
         highestPnL: 0,
+        openedTimestamp: Date.now(),
         openedAt: new Date().toLocaleTimeString('en-IN', { hour12: false })
       };
 
