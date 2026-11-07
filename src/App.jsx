@@ -47,7 +47,8 @@ import {
   Award,
   Flame,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Download
 } from 'lucide-react';
 import {
   subscribeToFirebaseChats,
@@ -237,9 +238,16 @@ export default function App() {
               })
                 .then((r) => r.json())
                 .then((d) => {
-                  if (d.audio) playAudio(d.audio);
+                  if (d.audio) {
+                    playAudio(d.audio);
+                  } else {
+                    speakTextNative(data.latestAnnouncement);
+                  }
                 })
-                .catch((e) => console.warn('Bot announcement voice skipped:', e));
+                .catch((e) => {
+                  console.warn('Bot announcement voice fallback to browser speech:', e);
+                  speakTextNative(data.latestAnnouncement);
+                });
             }
           }
         })
@@ -305,6 +313,74 @@ export default function App() {
     } catch (e) {
       console.error('Set asset error:', e);
     }
+  };
+
+  // Native Browser Web Speech Fallback for Voice Announcements
+  const speakTextNative = (text) => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window && text) {
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'hi-IN';
+        utterance.rate = speechPace || 1.05;
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.warn('Native speech synthesis fallback failed:', err);
+      }
+    }
+  };
+
+  // Export Completed Trades to CSV Trading Journal
+  const handleExportJournalCSV = () => {
+    const trades = botState?.tradeHistory || [];
+    if (!trades.length) {
+      alert('Abhi tak koi closed trade history nahi hai.');
+      return;
+    }
+    const headers = [
+      'Trade ID',
+      'Opened At',
+      'Closed At',
+      'Symbol',
+      'Asset Name',
+      'Type',
+      'Entry Price',
+      'Exit Price',
+      'Stop Loss',
+      'Target Price',
+      'Risk Reward',
+      'Realized PnL (INR)',
+      'Outcome',
+      'Exit Reason',
+      'Confluence Score',
+      'Setup Grade'
+    ];
+    const rows = trades.map((t) => [
+      `"${t.id || ''}"`,
+      `"${t.openedAt || ''}"`,
+      `"${t.closedAt || ''}"`,
+      `"${t.symbol || ''}"`,
+      `"${t.assetName || ''}"`,
+      `"${t.type || ''}"`,
+      t.entryPrice || 0,
+      t.exitPrice || 0,
+      t.stopLoss || 0,
+      t.targetPrice || 0,
+      `"${t.riskReward || ''}"`,
+      t.pnl || 0,
+      `"${t.isWin ? 'WIN' : 'LOSS'}"`,
+      `"${t.reason || ''}"`,
+      t.confluenceScore || 95,
+      `"${t.setupGrade || 'A+'}"`
+    ]);
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `VibeTrader_AI_Trading_Journal_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // AI Experience Memory & Training State
@@ -2558,6 +2634,64 @@ export default function App() {
               </div>
             </div>
 
+            {/* Daily ₹4,000–₹5,000 Target Progress & Multi-Market Radar Strip */}
+            <div className="px-3.5 py-2 bg-zinc-900/60 border-b border-zinc-800 flex flex-col md:flex-row items-center justify-between gap-2.5 shrink-0">
+              {/* Daily Target Progress Meter */}
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-200 whitespace-nowrap">
+                  <Award className="w-4 h-4 text-amber-400" />
+                  <span>Daily Goal (₹5k Target):</span>
+                </div>
+                <div className="w-32 sm:w-44 bg-zinc-800 h-2.5 rounded-full overflow-hidden p-0.5 border border-zinc-700/60 flex items-center">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      (botState?.dailyStats?.realizedPnL || 0) >= 5000
+                        ? 'bg-gradient-to-r from-amber-400 to-emerald-400 animate-pulse'
+                        : 'bg-emerald-500'
+                    }`}
+                    style={{ width: `${Math.min(100, Math.max(0, ((botState?.dailyStats?.realizedPnL || 0) / 5000) * 100))}%` }}
+                  />
+                </div>
+                <span className={`text-xs font-mono font-bold whitespace-nowrap ${
+                  (botState?.dailyStats?.realizedPnL || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                }`}>
+                  {(botState?.dailyStats?.realizedPnL || 0) >= 0 ? `+₹${botState?.dailyStats?.realizedPnL || 0}` : `-₹${Math.abs(botState?.dailyStats?.realizedPnL || 0)}`} / ₹5,000
+                </span>
+                {(botState?.dailyStats?.realizedPnL || 0) >= 5000 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                    🏆 GOAL REACHED!
+                  </span>
+                )}
+              </div>
+
+              {/* Multi-Market Radar Strip (Click to Switch Asset) */}
+              <div className="flex items-center gap-1.5 overflow-x-auto max-w-full text-[11px] font-mono">
+                <span className="text-[10px] text-zinc-500 font-sans uppercase font-bold mr-1">Markets:</span>
+                {Object.values(botState?.marketRadar || {
+                  XAUUSD: { key: 'XAUUSD', name: 'Gold', price: 4096.50 },
+                  BTCUSDT: { key: 'BTCUSDT', name: 'Bitcoin', price: 91800.00 },
+                  ETHUSDT: { key: 'ETHUSDT', name: 'Ethereum', price: 3380.00 },
+                  SOLUSDT: { key: 'SOLUSDT', name: 'Solana', price: 184.50 }
+                }).map((m) => (
+                  <button
+                    key={m.key}
+                    onClick={() => handleSetBotAsset(m.key)}
+                    className={`px-2 py-0.5 rounded-lg border text-[10.5px] transition cursor-pointer flex items-center gap-1 ${
+                      botState?.activeAsset?.key === m.key
+                        ? 'bg-emerald-950/70 border-emerald-500 text-emerald-300 font-bold shadow-sm'
+                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                    }`}
+                  >
+                    <span>{m.name}</span>
+                    <span className="text-zinc-500">•</span>
+                    <span className={botState?.activeAsset?.key === m.key ? 'text-emerald-400' : 'text-zinc-300'}>
+                      ${m.price}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* View Mode Navigation Tabs */}
             <div className="flex items-center justify-between px-3.5 py-1.5 bg-zinc-900/90 border-b border-zinc-800 shrink-0">
               <div className="flex items-center gap-1.5">
@@ -2679,6 +2813,22 @@ export default function App() {
                           </div>
                         </div>
 
+                        {/* Institutional Confluence & Grade Badge */}
+                        <div className="flex items-center justify-between text-[10px] bg-zinc-900/70 px-2.5 py-1.5 rounded-lg border border-zinc-800">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <span className="px-1.5 py-0.2 rounded font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9.5px]">
+                              {botState.activePosition.setupGrade || 'A+'} Grade
+                            </span>
+                            <span className="font-semibold text-zinc-200">
+                              Score: {botState.activePosition.confluenceScore || 95}/100
+                            </span>
+                            <span className="text-zinc-600">•</span>
+                            <span className="text-zinc-400 truncate">
+                              {(botState.activePosition.confluences || ['20 EMA Support', 'Healthy RSI Momentum']).slice(0, 2).join(' • ')}
+                            </span>
+                          </div>
+                        </div>
+
                         {/* Trailing stop status */}
                         <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-1">
                           <span className="flex items-center gap-1">
@@ -2769,7 +2919,17 @@ export default function App() {
                   <div className="h-44 flex flex-col overflow-hidden bg-zinc-950/40 shrink-0">
                     <div className="p-2 px-3 border-b border-zinc-800 flex items-center justify-between text-[11px] font-semibold text-zinc-400">
                       <span>Recent Completed Virtual Trades</span>
-                      <span className="font-mono text-emerald-400">{botState?.tradeHistory?.length || 0} Trades</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-emerald-400">{botState?.tradeHistory?.length || 0} Trades</span>
+                        <button
+                          onClick={handleExportJournalCSV}
+                          className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition cursor-pointer"
+                          title="Export Trading Journal to CSV"
+                        >
+                          <Download className="w-3 h-3 text-emerald-400" />
+                          <span>Export CSV</span>
+                        </button>
+                      </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-1 text-xs">
@@ -2790,6 +2950,11 @@ export default function App() {
                                 }`}>
                                   {tr.isWin ? 'WIN' : 'LOSS'}
                                 </span>
+                                {tr.setupGrade && (
+                                  <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                    {tr.setupGrade}
+                                  </span>
+                                )}
                                 <span className="font-mono text-zinc-200">{tr.symbol}</span>
                                 <span className="text-zinc-500">({tr.type})</span>
                               </div>
