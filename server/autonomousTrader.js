@@ -120,6 +120,9 @@ export class AutonomousTrader {
       circuitBreakerTripped: false
     };
 
+    // Live Real-Time Radar Scanner Status
+    this.scannerStatus = 'Scanning market for 20 EMA pullback & RSI momentum...';
+
     // Load persisted state if available
     this.wasRunning = true;
     this.loadState();
@@ -760,19 +763,24 @@ export class AutonomousTrader {
 
     // 1. Daily Circuit Breaker Check (Strict Risk Shield: 2 losses = halt for the day)
     if (this.dailyStats.lossCount >= 2) {
+      this.scannerStatus = '🛑 Daily Circuit Breaker Active: 2 losses hit today (-₹2,000 max drawdown). Capital 100% protected.';
       if (Math.random() < 0.08) {
-        this.addLog('CIRCUIT_BREAKER', '🛑 Daily Circuit Breaker Active: 2 losses hit today (-₹2,000 max drawdown). Capital 100% protected. No new trades today.');
+        this.addLog('CIRCUIT_BREAKER', this.scannerStatus);
       }
       return;
     }
 
     // 2. Max Daily Trades Limit (Overtrading Shield: max 4 trades per day)
     if (this.dailyStats.tradesCount >= 4) {
+      this.scannerStatus = '🛡️ Max 4 disciplined trades reached for today. Sitting on hands to prevent overtrading.';
       if (Math.random() < 0.08) {
-        this.addLog('RISK_SHIELD', '🛡️ Max 4 disciplined trades reached for today. Sitting on hands to prevent overtrading.');
+        this.addLog('RISK_SHIELD', this.scannerStatus);
       }
       return;
     }
+
+    // Update real-time radar scanning status
+    this.scannerStatus = `Radar Active: Watching ${asset.name} @ $${currentPrice} (20 EMA: $${ema20} | RSI: ${rsi})`;
 
     // Periodic Continuous AI Market Structure Study (~every 3-4 minutes)
     this.cycleCounter = (this.cycleCounter || 0) + 1;
@@ -788,13 +796,13 @@ export class AutonomousTrader {
     // Mathematical Trading Rules (Minervini VCP + 20 EMA Pullback + Risk Gate)
     const riskAmount = Number((this.wallet.balance * this.riskPerTradePct).toFixed(2)); // 1% Risk (₹1,000)
 
-    // BUY Condition: Price above 20 EMA, RSI between 46 and 64 (Healthy momentum, not overbought)
-    const isBullishPullback = (currentPrice >= ema20 * 0.998) && (rsi >= 46 && rsi <= 64);
-    // SELL Condition: Price below 20 EMA, RSI between 36 and 54
-    const isBearishRejection = (currentPrice <= ema20 * 1.002) && (rsi >= 36 && rsi <= 54);
+    // BUY Condition: Price near/above 20 EMA, RSI healthy momentum
+    const isBullishPullback = (currentPrice >= ema20 * 0.997) && (rsi >= 44 && rsi <= 66);
+    // SELL Condition: Price near/below 20 EMA, RSI bearish momentum
+    const isBearishRejection = (currentPrice <= ema20 * 1.003) && (rsi >= 34 && rsi <= 56);
 
-    // Random trigger filter so it doesn't overtrade every second (acts like a patient human)
-    const triggerNow = Math.random() < 0.35;
+    // Responsive trigger filter so it doesn't freeze or wait endlessly
+    const triggerNow = Math.random() < 0.65;
 
     if (triggerNow && (isBullishPullback || isBearishRejection)) {
       const type = isBullishPullback ? 'BUY' : 'SELL';
@@ -809,6 +817,7 @@ export class AutonomousTrader {
         dailyTradesCount: this.dailyStats.tradesCount
       });
       if (!ruleCheck.allowed) {
+        this.scannerStatus = `🛡️ Safety Shield: ${ruleCheck.reason}`;
         this.addLog('MEMORY_GATE', `🛡️ Setup avoided by Learned Rule: ${ruleCheck.reason}`);
         return;
       }
@@ -987,6 +996,7 @@ Write 1 brief insight (Hinglish/English, under 20 words) analyzing current insti
       riskRewardRatio: this.riskRewardRatio,
       dailyStats: this.dailyStats,
       marketRadar: this.marketRadar,
+      scannerStatus: this.scannerStatus,
       memory: traderMemory.getState()
     };
   }

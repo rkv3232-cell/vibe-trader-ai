@@ -2854,21 +2854,25 @@ export default function App() {
                       </div>
                     ) : (
                       <div className="p-4 rounded-xl bg-zinc-950/50 border border-zinc-800/80 text-center flex flex-col items-center justify-center">
-                        <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 mb-2 border border-emerald-500/30 animate-pulse">
+                        <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 mb-2 border border-emerald-500/30">
                           <Activity className="w-4 h-4 animate-spin" />
                         </div>
-                        <div className="text-xs font-semibold text-zinc-200 mb-0.5">
+                        <div className="text-xs font-semibold text-zinc-200 mb-1 flex items-center justify-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block"></span>
                           {botState?.dailyStats?.circuitBreakerTripped
                             ? '🛑 Daily Circuit Breaker Active'
                             : botState?.isRunning
-                            ? 'Scanning Market for 20 EMA Setup (Target ₹4,000–₹5,000+)...'
+                            ? '24/7 Market Radar Active'
                             : 'Autopilot Paused'}
                         </div>
-                        <div className="text-[10px] text-zinc-400 max-w-xs">
+                        <div className="text-[11px] text-emerald-300 font-mono bg-zinc-900/90 px-3 py-1.5 rounded-lg border border-zinc-800 my-1.5 max-w-sm truncate">
+                          {botState?.scannerStatus || `Scanning ${botState?.activeAsset?.name || 'Gold'} • 20 EMA & RSI Momentum Setup`}
+                        </div>
+                        <div className="text-[10px] text-zinc-400 max-w-xs mt-0.5">
                           {botState?.dailyStats?.circuitBreakerTripped
                             ? 'Max 2 daily losses hit (-₹2,000 risk cap). Capital 100% protected until tomorrow.'
                             : botState?.isRunning
-                            ? `Checking 20 EMA pullback test, RSI momentum & dynamic runner trailing. Today: ${botState?.dailyStats?.tradesCount || 0}/4 trades.`
+                            ? `Patience is edge: Only taking A+ Grade setups (Target: ₹4k–₹5k+) • Today: ${botState?.dailyStats?.tradesCount || 0}/4 trades.`
                             : 'Click "Start 24/7 Autopilot" to let the bot trade automatically.'}
                         </div>
                       </div>
