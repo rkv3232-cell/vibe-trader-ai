@@ -370,6 +370,74 @@ export class AutonomousTrader {
     }
   }
 
+  // Fetch real 5-minute candlestick chart data for precise 9 EMA, 20 EMA, RSI & Trend Direction
+  async fetchMarketStructure(assetKey) {
+    const asset = this.assets[assetKey || this.activeAssetKey];
+    if (!asset) {
+      const fallbackEma = this.calculateEMA(20);
+      return { price: this.livePrice, ema9: fallbackEma, ema20: fallbackEma, rsi: 50, trend: 'BULLISH' };
+    }
+
+    try {
+      const url = `https://data-api.binance.vision/api/v3/klines?symbol=${asset.symbol}&interval=5m&limit=25`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const klines = await res.json();
+        if (Array.isArray(klines) && klines.length >= 15) {
+          const closes = klines.map(k => parseFloat(k[4]));
+          const currentClose = closes[closes.length - 1];
+
+          // Compute 9 EMA (Fast institutional momentum)
+          let ema9 = closes[0];
+          const k9 = 2 / (9 + 1);
+          for (let i = 1; i < closes.length; i++) ema9 = closes[i] * k9 + ema9 * (1 - k9);
+
+          // Compute 20 EMA (Primary institutional trend baseline)
+          let ema20 = closes[0];
+          const k20 = 2 / (20 + 1);
+          for (let i = 1; i < closes.length; i++) ema20 = closes[i] * k20 + ema20 * (1 - k20);
+
+          // Compute RSI 14
+          let gains = 0, losses = 0;
+          const p = 14;
+          for (let i = closes.length - p; i < closes.length; i++) {
+            const diff = closes[i] - closes[i - 1];
+            if (diff >= 0) gains += diff;
+            else losses += Math.abs(diff);
+          }
+          let rsi = 50.0;
+          if (losses === 0) rsi = 100.0;
+          else {
+            const rs = (gains / p) / (losses / p);
+            rsi = Number((100 - (100 / (1 + rs))).toFixed(1));
+          }
+
+          const trend = ema9 >= ema20 ? 'BULLISH' : 'BEARISH';
+          return {
+            price: currentClose,
+            ema9: Number(ema9.toFixed(asset.decimals)),
+            ema20: Number(ema20.toFixed(asset.decimals)),
+            rsi,
+            trend
+          };
+        }
+      }
+    } catch (e) {
+      // Fallback below
+    }
+
+    const fallbackEma = this.calculateEMA(20);
+    const fallbackRsi = this.calculateRSI(14);
+    const trend = this.livePrice >= fallbackEma ? 'BULLISH' : 'BEARISH';
+    return {
+      price: this.livePrice,
+      ema9: fallbackEma,
+      ema20: fallbackEma,
+      rsi: fallbackRsi,
+      trend
+    };
+  }
+
   // Record price tick for indicator calculation
   recordTick(price) {
     this.priceTicks.push(price);
@@ -485,10 +553,10 @@ export class AutonomousTrader {
         const posPrice = (posAssetKey === this.activeAssetKey)
           ? activePrice
           : await this.fetchPriceForAsset(posAssetKey);
-        this.manageOpenPosition(posPrice);
+        await this.manageOpenPosition(posPrice);
       } else {
         // 3. Scan for high-probability setups if idle on active asset
-        this.scanAndEvaluateMarket(activePrice);
+        await this.scanAndEvaluateMarket(activePrice);
       }
 
       // 4. Update equity and drawdown
@@ -502,8 +570,8 @@ export class AutonomousTrader {
     }
   }
 
-  // Manage Active Position (Check Stop Loss, Take Profit, Trailing Stop)
-  manageOpenPosition(currentPrice) {
+  // Manage Active Position (Check Stop Loss, Take Profit, Trailing Stop, Dynamic AI Control)
+  async manageOpenPosition(currentPrice) {
     const pos = this.activePosition;
     if (!pos) return;
 
@@ -528,75 +596,95 @@ export class AutonomousTrader {
 
     // Current R-Multiple (Risk-to-Reward multiple achieved so far)
     const currentR = pos.riskAmount > 0 ? (pos.unrealizedPnL / pos.riskAmount) : 0;
+    const openDurationMs = Date.now() - (pos.openedTimestamp || 0);
 
     // ==============================================================
     // 🚀 DYNAMIC PROFIT-RIDING TRAILING ENGINE (TARGET: ₹4,000–₹5,000+)
     // ==============================================================
 
-    // 1. Break-Even Protection (at +1.0R ~ +1.2R) -> 100% Free Trade!
-    if ((!pos.trailingStage || pos.trailingStage === 'INITIAL_RISK') && currentR >= 1.0) {
+    // 1. Break-Even Protection (at +0.7R ~ +₹700 profit) -> Zero Risk!
+    if ((!pos.trailingStage || pos.trailingStage === 'INITIAL_RISK') && currentR >= 0.7) {
       pos.trailingStage = 'BREAKEVEN';
       pos.isTrailingActive = true;
       pos.stopLoss = pos.entryPrice;
-      this.addLog('TRAIL_SL', `🛡️ Trailing Stop Loss moved to Cost (${pos.entryPrice}). Risk is now ₹0 (Free Trade)!`);
+      this.addLog('TRAIL_SL', `🛡️ Trailing Stop Loss moved to Cost ($${pos.entryPrice}). Risk is now ₹0 (Free Trade)!`);
     }
 
-    // 2. Milestone 2R (+₹2,000 profit): Lock in +1.2R profit (+₹1,200 guaranteed!)
-    // Instead of cutting the trade, let the winner ride toward ₹3,000–₹5,000+!
-    if (pos.trailingStage === 'BREAKEVEN' && currentR >= 2.0) {
+    // 2. Milestone 1.2R (+₹1,200 profit): Lock in +0.8R profit (+₹800 guaranteed!)
+    if (pos.trailingStage === 'BREAKEVEN' && currentR >= 1.2) {
+      pos.trailingStage = 'TRAIL_1R';
+      const lockPrice = pos.type === 'BUY'
+        ? Number((pos.entryPrice + stopDistance * 0.8).toFixed(asset.decimals))
+        : Number((pos.entryPrice - stopDistance * 0.8).toFixed(asset.decimals));
+      pos.stopLoss = lockPrice;
+      this.addLog('TRAIL_RUNNER', `🛡️ Profit Secured! Stop Loss ratcheted to lock +₹${Math.round(pos.riskAmount * 0.8)} guaranteed profit.`);
+    }
+
+    // 3. Milestone 2R (+₹2,000 profit): Lock in +1.5R profit (+₹1,500 guaranteed!)
+    if ((pos.trailingStage === 'TRAIL_1R' || pos.trailingStage === 'BREAKEVEN') && currentR >= 2.0) {
       pos.trailingStage = 'TRAIL_2R';
       const lockPrice = pos.type === 'BUY'
-        ? Number((pos.entryPrice + stopDistance * 1.2).toFixed(asset.decimals))
-        : Number((pos.entryPrice - stopDistance * 1.2).toFixed(asset.decimals));
+        ? Number((pos.entryPrice + stopDistance * 1.5).toFixed(asset.decimals))
+        : Number((pos.entryPrice - stopDistance * 1.5).toFixed(asset.decimals));
       pos.stopLoss = lockPrice;
       pos.targetPrice = pos.type === 'BUY'
         ? Number((pos.entryPrice + stopDistance * 3.0).toFixed(asset.decimals))
         : Number((pos.entryPrice - stopDistance * 3.0).toFixed(asset.decimals));
-      this.addLog('TRAIL_RUNNER', `🚀 1:2 R:R Milestone Achieved! Locked +₹${Math.round(pos.riskAmount * 1.2)} guaranteed profit. Allowing runner to target ₹3,000–₹5,000+!`);
+      this.addLog('TRAIL_RUNNER', `🚀 1:2 R:R Milestone Achieved! Locked +₹${Math.round(pos.riskAmount * 1.5)} guaranteed profit. Allowing runner to target ₹3,000–₹5,000+!`);
     }
 
-    // 3. Milestone 3R (+₹3,000 profit): Lock in +2.0R profit (+₹2,000 guaranteed!)
+    // 4. Milestone 3R (+₹3,000 profit): Lock in +2.2R profit (+₹2,200 guaranteed!)
     if (pos.trailingStage === 'TRAIL_2R' && currentR >= 3.0) {
       pos.trailingStage = 'TRAIL_3R';
       const lockPrice = pos.type === 'BUY'
-        ? Number((pos.entryPrice + stopDistance * 2.0).toFixed(asset.decimals))
-        : Number((pos.entryPrice - stopDistance * 2.0).toFixed(asset.decimals));
+        ? Number((pos.entryPrice + stopDistance * 2.2).toFixed(asset.decimals))
+        : Number((pos.entryPrice - stopDistance * 2.2).toFixed(asset.decimals));
       pos.stopLoss = lockPrice;
       pos.targetPrice = pos.type === 'BUY'
         ? Number((pos.entryPrice + stopDistance * 4.0).toFixed(asset.decimals))
         : Number((pos.entryPrice - stopDistance * 4.0).toFixed(asset.decimals));
-      this.addLog('TRAIL_RUNNER', `🔥 1:3 R:R Achieved (+₹3,000+)! Stop Loss ratcheted to lock +₹${Math.round(pos.riskAmount * 2.0)} profit. Hunting ₹4,000–₹5,000+!`);
+      this.addLog('TRAIL_RUNNER', `🔥 1:3 R:R Achieved (+₹3,000+)! Stop Loss ratcheted to lock +₹${Math.round(pos.riskAmount * 2.2)} profit. Hunting ₹4,000–₹5,000+!`);
     }
 
-    // 4. Milestone 4R (+₹4,000 profit): Lock in +3.0R profit (+₹3,000 guaranteed!)
+    // 5. Milestone 4R (+₹4,000 profit): Lock in +3.2R profit (+₹3,200 guaranteed!)
     if (pos.trailingStage === 'TRAIL_3R' && currentR >= 4.0) {
       pos.trailingStage = 'TRAIL_4R';
       const lockPrice = pos.type === 'BUY'
-        ? Number((pos.entryPrice + stopDistance * 3.0).toFixed(asset.decimals))
-        : Number((pos.entryPrice - stopDistance * 3.0).toFixed(asset.decimals));
+        ? Number((pos.entryPrice + stopDistance * 3.2).toFixed(asset.decimals))
+        : Number((pos.entryPrice - stopDistance * 3.2).toFixed(asset.decimals));
       pos.stopLoss = lockPrice;
       pos.targetPrice = pos.type === 'BUY'
         ? Number((pos.entryPrice + stopDistance * 5.0).toFixed(asset.decimals))
         : Number((pos.entryPrice - stopDistance * 5.0).toFixed(asset.decimals));
-      this.addLog('TRAIL_RUNNER', `⚡ 1:4 R:R Achieved (+₹4,000+)! Stop Loss ratcheted to lock +₹${Math.round(pos.riskAmount * 3.0)} profit. Approaching ₹5,000+ Mega Target!`);
+      this.addLog('TRAIL_RUNNER', `⚡ 1:4 R:R Achieved (+₹4,000+)! Stop Loss ratcheted to lock +₹${Math.round(pos.riskAmount * 3.2)} profit. Approaching ₹5,000+ Mega Target!`);
     }
 
-    // 5. Mega Milestone 5R (+₹5,000+ profit!): Lock in +4.0R profit (+₹4,000 guaranteed!)
+    // 6. Mega Milestone 5R (+₹5,000+ profit!): Lock in +4.2R profit (+₹4,200 guaranteed!)
     if (pos.trailingStage === 'TRAIL_4R' && currentR >= 5.0) {
       pos.trailingStage = 'TRAIL_5R_PLUS';
       const lockPrice = pos.type === 'BUY'
-        ? Number((pos.entryPrice + stopDistance * 4.0).toFixed(asset.decimals))
-        : Number((pos.entryPrice - stopDistance * 4.0).toFixed(asset.decimals));
+        ? Number((pos.entryPrice + stopDistance * 4.2).toFixed(asset.decimals))
+        : Number((pos.entryPrice - stopDistance * 4.2).toFixed(asset.decimals));
       pos.stopLoss = lockPrice;
-      this.addLog('TRAIL_RUNNER', `🏆 MEGA ₹5,000+ PROFIT REACHED! Stop Loss locked at +₹${Math.round(pos.riskAmount * 4.0)}. Trend runner is uncapped!`);
-      this.latestAnnouncement = `Raj bhai! Hamara uncapped runner ₹5,000+ target tak pahunch gaya hai! Stop loss safely ₹4,000 profit par locked hai.`;
+      this.addLog('TRAIL_RUNNER', `🏆 MEGA ₹5,000+ PROFIT REACHED! Stop Loss locked at +₹${Math.round(pos.riskAmount * 4.2)}. Trend runner is uncapped!`);
+      this.latestAnnouncement = `Raj bhai! Hamara uncapped runner ₹5,000+ target tak pahunch gaya hai! Stop loss safely ₹4,200 profit par locked hai.`;
     }
 
     // ==============================================================
-    // 🛑 EXIT VERIFICATIONS
+    // 🛑 DYNAMIC ACTIVE EXIT & TIMELY DECISIONS
     // ==============================================================
 
-    // Check A: Stop Loss or Trailing Stop Trigger
+    // Check 1: 1:2 R:R Target Hit Check
+    const isTargetHit = pos.type === 'BUY'
+      ? currentPrice >= pos.targetPrice
+      : currentPrice <= pos.targetPrice;
+
+    if (isTargetHit) {
+      this.closePosition('TARGET_HIT', currentPrice);
+      return;
+    }
+
+    // Check 2: Stop Loss or Trailing Stop Trigger
     const isStopLossHit = pos.type === 'BUY'
       ? currentPrice <= pos.stopLoss
       : currentPrice >= pos.stopLoss;
@@ -609,8 +697,24 @@ export class AutonomousTrader {
       return;
     }
 
-    // Check B: Trend Exhaustion Reversal (if trade reached >= +2R and trend reverses against 20 EMA)
+    // Check 3: Active Early Invalidation Cut (Protect Capital Before Full SL!)
     const ema20 = this.calculateEMA(20);
+    if (openDurationMs > 2 * 60 * 1000 && pos.unrealizedPnL <= -350 && pos.unrealizedPnL > -900) {
+      const isStructBroken = (pos.type === 'BUY' && currentPrice < ema20 * 0.996) ||
+                             (pos.type === 'SELL' && currentPrice > ema20 * 1.004);
+      if (isStructBroken) {
+        this.closePosition('EARLY_MOMENTUM_CUT', currentPrice);
+        return;
+      }
+    }
+
+    // Check 4: Active Stagnation Exit (If trade is dead flat for 15+ minutes)
+    if (openDurationMs > 15 * 60 * 1000 && Math.abs(pos.unrealizedPnL) < 250) {
+      this.closePosition('ACTIVE_STAGNATION_EXIT', currentPrice);
+      return;
+    }
+
+    // Check 5: Trend Exhaustion Reversal (if trade reached >= +2R and trend reverses against 20 EMA)
     const rsi = this.calculateRSI(14);
     const isExhaustion = currentR >= 2.0 && (
       (pos.type === 'BUY' && (currentPrice < ema20 * 0.998 || rsi > 78)) ||
@@ -622,20 +726,15 @@ export class AutonomousTrader {
       return;
     }
 
-    // Check C: Stagnation Profit Harvest (If trade in profit for > 45 minutes during low-volatility dead zone)
-    const openDurationMs = Date.now() - (pos.openedTimestamp || 0);
-    const isStagnantProfit = openDurationMs > 45 * 60 * 1000 && pos.unrealizedPnL >= 250;
-    if (isStagnantProfit) {
-      const recentTicks = this.priceTicks.slice(-20);
-      if (recentTicks.length >= 8) {
-        const minP = Math.min(...recentTicks);
-        const maxP = Math.max(...recentTicks);
-        const rangePct = (maxP - minP) / (minP || 1);
-        if (rangePct < 0.0008) {
-          this.closePosition('STAGNATION_PROFIT_HARVEST', currentPrice);
-          return;
-        }
-      }
+    // Update Live AI Control Decision telemetry for UI
+    if (pos.trailingStage && pos.trailingStage !== 'INITIAL_RISK') {
+      pos.activeDecision = `🛡️ Profit Locked (+₹${Math.round(pos.riskAmount * 0.8)}). Trailing SL @ $${pos.stopLoss} hunting runner.`;
+    } else if (pos.unrealizedPnL >= 450) {
+      pos.activeDecision = `🚀 Trend Surging (+₹${pos.unrealizedPnL}). Approaching Target ($${pos.targetPrice}).`;
+    } else if (pos.unrealizedPnL <= -300) {
+      pos.activeDecision = `⚠️ Structure Test (-₹${Math.abs(pos.unrealizedPnL)}). Monitoring 20 EMA defense.`;
+    } else {
+      pos.activeDecision = `⚡ Active Decision: Holding ${pos.type} with 20 EMA structure. Target: $${pos.targetPrice}`;
     }
   }
 
@@ -676,9 +775,12 @@ export class AutonomousTrader {
     if (isWin) {
       this.dailyStats.winCount += 1;
     } else {
-      this.dailyStats.lossCount += 1;
-      if (this.dailyStats.lossCount >= 2) {
-        this.dailyStats.circuitBreakerTripped = true;
+      // Only full stop losses (or heavy losses >= ₹800) count toward the 2-loss daily circuit breaker
+      if (reason === 'STOP_LOSS_HIT' || Math.abs(finalPnL) >= 800) {
+        this.dailyStats.lossCount += 1;
+        if (this.dailyStats.lossCount >= 2) {
+          this.dailyStats.circuitBreakerTripped = true;
+        }
       }
     }
 
@@ -714,9 +816,12 @@ export class AutonomousTrader {
     }
 
     if (isWin) {
-      if (reason === 'STAGNATION_PROFIT_HARVEST') {
-        this.addLog('HARVEST', `🛡️ Stagnation Harvest: Booked +₹${finalPnL} on ${pos.symbol} after market chop. Freeing capital for active momentum.`);
-        this.latestAnnouncement = `Raj bhai, slow market mein maine safely ₹${finalPnL} profit book kar liya hai. Ab hum fresh high-momentum setup hunt kar rahe hain.`;
+      if (reason === 'TARGET_HIT') {
+        this.addLog('WIN', `🎯 1:2 TARGET HIT! Booked +₹${finalPnL} on ${pos.symbol} (${riskReward} R:R achieved)!`);
+        this.latestAnnouncement = `Badhai ho Raj bhai! ${pos.assetName} mein 1:2 target hit hua hai aur +₹${finalPnL} profit book ho gaya hai!`;
+      } else if (reason === 'ACTIVE_STAGNATION_EXIT') {
+        this.addLog('HARVEST', `⏱️ Active Stagnation Exit: Closed with +₹${finalPnL} after 15 mins flat. Freeing capital.`);
+        this.latestAnnouncement = `Raj bhai, slow market se safely ₹${finalPnL} profit nikaal kar capital fresh setup ke liye free kar diya hai.`;
       } else if (finalPnL >= 4000) {
         this.addLog('WIN', `🏆 MEGA RUNNER WINNER! Booked +₹${finalPnL} on ${pos.symbol} (${riskReward} R:R) with Dynamic Profit Trailing!`);
         this.latestAnnouncement = `Shaandaar Raj bhai! Uncapped trailing runner ne ₹${finalPnL} ka zabardast profit book kiya hai!`;
@@ -728,11 +833,19 @@ export class AutonomousTrader {
         this.latestAnnouncement = `Raj bhai, trade safely positive close hua hai with ₹${finalPnL} profit.`;
       }
     } else {
-      this.addLog('LOSS', `🛑 Stop Loss Hit at ${exitPrice}. Loss strictly capped at ₹${Math.abs(finalPnL)}. Capital safe.`);
+      if (reason === 'EARLY_MOMENTUM_CUT') {
+        this.addLog('RISK_CUT', `✂️ Early Discipline Cut at ${exitPrice}: Loss controlled to -₹${Math.abs(finalPnL)} (saved ₹${1000 - Math.abs(finalPnL)} capital before SL)!`);
+        this.latestAnnouncement = `Raj bhai, trend reverse hone par maine position jaldi cut kar di. Poora stop loss nahi hone diya, ₹${1000 - Math.abs(finalPnL)} capital safe raha.`;
+      } else if (reason === 'ACTIVE_STAGNATION_EXIT') {
+        this.addLog('HARVEST', `⏱️ Active Stagnation Exit: Closed flat at ${exitPrice} (-₹${Math.abs(finalPnL)}). Reallocating capital.`);
+      } else {
+        this.addLog('LOSS', `🛑 Stop Loss Hit at ${exitPrice}. Loss strictly capped at ₹${Math.abs(finalPnL)}. Capital safe.`);
+      }
+
       if (this.dailyStats.lossCount >= 2) {
         this.addLog('CIRCUIT_BREAKER', `🛑 DAILY CIRCUIT BREAKER ACTIVATED: 2 Stop Losses hit today (-₹2,000 max risk). Trading halted until next day to protect capital.`);
         this.latestAnnouncement = `Raj bhai, aaj 2 stop loss hit ho gaye hain. Circuit breaker activate ho gaya hai taaki hamara capital 100% safe rahe. Aaj ab aur trades nahi lenge.`;
-      } else {
+      } else if (reason !== 'EARLY_MOMENTUM_CUT') {
         this.latestAnnouncement = `Raj bhai, ${pos.assetName} mein stop loss trigger hua hai. Hamara risk strictly ₹${Math.abs(finalPnL)} par control raha. Discipline se agla setup dekhenge.`;
       }
     }
@@ -755,11 +868,9 @@ export class AutonomousTrader {
     }
   }
 
-  // Scan Market & Look for Institutional 1:2 Setups
-  scanAndEvaluateMarket(currentPrice) {
+  // Scan Market & Look for Symmetrical Institutional Setups (Equal 50/50 BUY & SELL)
+  async scanAndEvaluateMarket(currentPrice) {
     const asset = this.assets[this.activeAssetKey];
-    const ema20 = this.calculateEMA(20);
-    const rsi = this.calculateRSI(14);
 
     // 1. Daily Circuit Breaker Check (Strict Risk Shield: 2 losses = halt for the day)
     if (this.dailyStats.lossCount >= 2) {
@@ -770,17 +881,24 @@ export class AutonomousTrader {
       return;
     }
 
-    // 2. Max Daily Trades Limit (Overtrading Shield: max 4 trades per day)
-    if (this.dailyStats.tradesCount >= 4) {
-      this.scannerStatus = '🛡️ Max 4 disciplined trades reached for today. Sitting on hands to prevent overtrading.';
+    // 2. Max Daily Trades Limit (10 quality disciplined trades per day)
+    if (this.dailyStats.tradesCount >= 10) {
+      this.scannerStatus = '🛡️ Max 10 disciplined trades reached for today. Sitting on hands to prevent overtrading.';
       if (Math.random() < 0.08) {
         this.addLog('RISK_SHIELD', this.scannerStatus);
       }
       return;
     }
 
-    // Update real-time radar scanning status
-    this.scannerStatus = `Radar Active: Watching ${asset.name} @ $${currentPrice} (20 EMA: $${ema20} | RSI: ${rsi})`;
+    // 3. Fetch real candlestick market structure from Binance Vision
+    const struct = await this.fetchMarketStructure(this.activeAssetKey);
+    const ema9 = struct.ema9;
+    const ema20 = struct.ema20;
+    const rsi = struct.rsi;
+    const trend = struct.trend; // 'BULLISH' or 'BEARISH'
+
+    // Update real-time radar scanning status with live Trend & EMAs
+    this.scannerStatus = `Radar Active: Watching ${asset.name} @ $${currentPrice} | Trend: ${trend === 'BEARISH' ? '🔴 DOWNTREND (SELL BIAS)' : '🟢 UPTREND (BUY BIAS)'} (9 EMA: $${ema9} | 20 EMA: $${ema20} | RSI: ${rsi})`;
 
     // Periodic Continuous AI Market Structure Study (~every 3-4 minutes)
     this.cycleCounter = (this.cycleCounter || 0) + 1;
@@ -790,22 +908,38 @@ export class AutonomousTrader {
 
     // Human thought logs
     if (Math.random() < 0.28) {
-      this.addLog('MIND', `Watching ${asset.name} at ${currentPrice}. 20 EMA: ${ema20} | RSI: ${rsi}. Today: ${this.dailyStats.tradesCount}/4 trades (${this.dailyStats.lossCount}/2 losses).`);
+      this.addLog('MIND', `Watching ${asset.name} at ${currentPrice}. Trend: ${trend} | 9 EMA: ${ema9} | 20 EMA: ${ema20} | RSI: ${rsi}. Today: ${this.dailyStats.tradesCount}/10 trades (${this.dailyStats.lossCount}/2 losses).`);
     }
 
-    // Mathematical Trading Rules (Minervini VCP + 20 EMA Pullback + Risk Gate)
-    const riskAmount = Number((this.wallet.balance * this.riskPerTradePct).toFixed(2)); // 1% Risk (₹1,000)
+    // Symmetrical Trade Setup Detection (100% equal chance for SELL and BUY)
+    let setupType = null;
 
-    // BUY Condition: Price near/above 20 EMA, RSI healthy momentum
-    const isBullishPullback = (currentPrice >= ema20 * 0.997) && (rsi >= 44 && rsi <= 66);
-    // SELL Condition: Price near/below 20 EMA, RSI bearish momentum
-    const isBearishRejection = (currentPrice <= ema20 * 1.003) && (rsi >= 34 && rsi <= 56);
+    // Symmetrical SELL / SHORT Candidate:
+    // In a downtrend (ema9 <= ema20), price tests 20 EMA resistance, RSI healthy (25 to 58)
+    const isBearishSetup = (trend === 'BEARISH' || ema9 <= ema20) &&
+      (currentPrice <= ema20 * 1.004) &&
+      (rsi <= 58 && rsi >= 25);
 
-    // Responsive trigger filter so it doesn't freeze or wait endlessly
+    // Symmetrical BUY / LONG Candidate:
+    // In an uptrend (ema9 >= ema20), price tests 20 EMA support, RSI healthy (42 to 75)
+    const isBullishSetup = (trend === 'BULLISH' || ema9 >= ema20) &&
+      (currentPrice >= ema20 * 0.996) &&
+      (rsi >= 42 && rsi <= 75);
+
+    if (isBearishSetup && !isBullishSetup) {
+      setupType = 'SELL';
+    } else if (isBullishSetup && !isBearishSetup) {
+      setupType = 'BUY';
+    } else if (isBearishSetup && isBullishSetup) {
+      setupType = ema9 < ema20 ? 'SELL' : 'BUY';
+    }
+
+    // Responsive trigger filter
     const triggerNow = Math.random() < 0.65;
 
-    if (triggerNow && (isBullishPullback || isBearishRejection)) {
-      const type = isBullishPullback ? 'BUY' : 'SELL';
+    if (triggerNow && setupType) {
+      const type = setupType;
+      const riskAmount = Number((this.wallet.balance * this.riskPerTradePct).toFixed(2)); // 1% Risk (₹1,000)
 
       // Experience Check: Verify candidate setup against permanently learned rules
       const ruleCheck = traderMemory.checkSetupAgainstRules({
@@ -821,22 +955,22 @@ export class AutonomousTrader {
         this.addLog('MEMORY_GATE', `🛡️ Setup avoided by Learned Rule: ${ruleCheck.reason}`);
         return;
       }
-      this.addLog('KNOWLEDGE', `✅ All ${traderMemory.learnedRules.length} learned rules verified. Risk & structure approved.`);
+      this.addLog('KNOWLEDGE', `✅ All ${traderMemory.learnedRules.length} learned rules verified. Risk & structure approved for ${type}.`);
 
       const now = new Date();
       const istDay = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay();
-      const isWeekend = (istDay === 0 || istDay === 6); // 0 = Sunday, 6 = Saturday
+      const isWeekend = (istDay === 0 || istDay === 6);
 
-      // Adaptive Volatility Scalp Sizing:
-      // Gold on weekend uses tighter 0.0012 (~$4.80) so small moves hit big targets 2.5x faster!
-      // Bitcoin uses 0.0035, Solana 0.0045 for healthy breathing space.
-      let stopPct = 0.0025;
-      if (this.activeAssetKey === 'XAUUSD' && isWeekend) {
-        stopPct = 0.0012; // 0.12% precision scalp for weekend gold (~$4.80)
+      // Adaptive Volatility Scalp Sizing (Optimized for active day trading):
+      let stopPct = 0.0020;
+      if (this.activeAssetKey === 'XAUUSD') {
+        stopPct = isWeekend ? 0.0010 : 0.0015;
       } else if (this.activeAssetKey === 'BTCUSDT') {
-        stopPct = 0.0035;
+        stopPct = 0.0025;
       } else if (this.activeAssetKey === 'SOLUSDT') {
-        stopPct = 0.0045;
+        stopPct = 0.0035;
+      } else if (this.activeAssetKey === 'ETHUSDT') {
+        stopPct = 0.0025;
       }
 
       const stopDistance = Math.max(
@@ -865,12 +999,18 @@ export class AutonomousTrader {
       } else if (type === 'SELL' && currentPrice <= ema20 * 1.002) {
         confluenceScore += 25;
         confluences.push('20 EMA Downtrend Resistance');
+      } else {
+        confluenceScore += 18;
+        confluences.push(`${type === 'BUY' ? 'Bullish' : 'Bearish'} Momentum Continuation`);
       }
 
       // 2. Momentum Filter: Healthy RSI Range (+25 pts)
-      if ((type === 'BUY' && rsi >= 46 && rsi <= 64) || (type === 'SELL' && rsi >= 36 && rsi <= 54)) {
+      if ((type === 'BUY' && rsi >= 44 && rsi <= 68) || (type === 'SELL' && rsi >= 32 && rsi <= 56)) {
         confluenceScore += 25;
         confluences.push(`Healthy RSI Momentum (${rsi})`);
+      } else {
+        confluenceScore += 18;
+        confluences.push(`RSI Trend Flow (${rsi})`);
       }
 
       // 3. Institutional Session Window (+20 pts)
@@ -917,6 +1057,7 @@ export class AutonomousTrader {
         setupGrade,
         confluences,
         highestPnL: 0,
+        activeDecision: `Active ${type}: Monitoring 20 EMA & trailing momentum. Target: $${targetPrice}`,
         openedTimestamp: Date.now(),
         openedAt: new Date().toLocaleTimeString('en-IN', { hour12: false })
       };
@@ -926,7 +1067,7 @@ export class AutonomousTrader {
         `🚀 EXECUTED VIRTUAL ${type}: ${asset.name} @ ${currentPrice} | Grade: ${setupGrade} (${confluenceScore}/100) | SL: ${stopLoss} | Target: ${targetPrice} (Uncapped Trailing Target: ₹4k–₹5k+)`
       );
 
-      this.latestAnnouncement = `Raj bhai, maine ${asset.name} mein ${currentPrice} par virtual ${type === 'BUY' ? 'Buy' : 'Short'} position open ki hai. Trailing engine active hai jo ₹4,000–₹5,000+ tak profit ride karega!`;
+      this.latestAnnouncement = `Raj bhai, maine ${asset.name} mein ${currentPrice} par virtual ${type === 'BUY' ? 'Buy (Long)' : 'Sell (Short)'} position open ki hai. Trailing engine active hai jo ₹4,000–₹5,000+ tak profit ride karega!`;
       this.saveState();
     }
   }

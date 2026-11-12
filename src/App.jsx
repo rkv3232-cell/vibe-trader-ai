@@ -2846,11 +2846,20 @@ export default function App() {
                                botState.activePosition.trailingStage === 'TRAIL_3R' ? '🔥 Locked +₹2k (Hunting ₹4k+)' :
                                botState.activePosition.trailingStage === 'TRAIL_2R' ? '🚀 Locked +₹1.2k (Hunting ₹3k+)' :
                                botState.activePosition.trailingStage === 'BREAKEVEN' ? '🛡️ Cost Breakeven (Zero Risk)' :
-                               'Pending +1.0R Breakeven'}
+                               'Pending +0.7R Breakeven'}
                             </span>
                           </span>
                           <span>Opened: {botState.activePosition.openedAt}</span>
                         </div>
+
+                        {/* Live AI Decision & Active Control Pill */}
+                        {botState.activePosition.activeDecision && (
+                          <div className="flex items-center gap-1.5 text-[10px] bg-zinc-900/90 border border-emerald-500/30 text-emerald-300 px-2.5 py-1.5 rounded-lg font-mono">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span className="font-bold text-zinc-300">Live AI Control:</span>
+                            <span className="truncate">{botState.activePosition.activeDecision}</span>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="p-4 rounded-xl bg-zinc-950/50 border border-zinc-800/80 text-center flex flex-col items-center justify-center">
