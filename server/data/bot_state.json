@@ -1,5 +1,8 @@
 {
-  "isRunning": true,
+  "isRunning": false,
+  "tradingMode": "TURBO",
+  "riskPerTradePct": 0.05,
+  "riskRewardRatio": 2.5,
   "wallet": {
     "initialCapital": 100000,
     "balance": 102000,
@@ -35,7 +38,7 @@
   ],
   "activeAssetKey": "XAUUSD",
   "dailyStats": {
-    "date": "2026-11-12",
+    "date": "2026-11-18",
     "tradesCount": 0,
     "lossCount": 0,
     "winCount": 0,
@@ -43,6 +46,36 @@
     "circuitBreakerTripped": false
   },
   "logs": [
+    {
+      "time": "21:38:18",
+      "category": "CONFIG",
+      "message": "🚀 ACTIVATED TURBO 10X GROWTH MODE: 5% Compounding Risk per trade! Target: ₹10k–₹25k+ runner wins!",
+      "id": 1795018098571.398
+    },
+    {
+      "time": "21:38:18",
+      "category": "CONFIG",
+      "message": "🛡️ ACTIVATED DISCIPLINED MODE: 1% Risk per trade. Maximum capital preservation.",
+      "id": 1795018098570.7646
+    },
+    {
+      "time": "21:38:18",
+      "category": "CONFIG",
+      "message": "🚀 ACTIVATED TURBO 10X GROWTH MODE: 5% Compounding Risk per trade! Target: ₹10k–₹25k+ runner wins!",
+      "id": 1795018098569.5432
+    },
+    {
+      "time": "21:38:18",
+      "category": "SYSTEM",
+      "message": "Autonomous Human Trader Engine initialized. Ready to trade 24/7.",
+      "id": 1795018098567.03
+    },
+    {
+      "time": "21:38:18",
+      "category": "SYSTEM",
+      "message": "🌅 New Trading Day (2026-11-18 IST). Daily Circuit Breaker and trade limits refreshed.",
+      "id": 1795018098567.718
+    },
     {
       "time": "19:24:36",
       "category": "MIND",
@@ -98,5 +131,5 @@
       "id": 1794052185000
     }
   ],
-  "updatedAt": "2026-11-12T13:54:36.000Z"
+  "updatedAt": "2026-11-18T16:08:18.571Z"
 }

@@ -488,6 +488,13 @@ app.post('/api/bot/set-asset', (req, res) => {
   res.json({ success: true, state: autonomousBot.getState() });
 });
 
+// POST Switch Bot Trading Engine Mode ('DISCIPLINED' vs 'TURBO')
+app.post('/api/bot/set-mode', (req, res) => {
+  const { mode } = req.body;
+  autonomousBot.setTradingMode(mode);
+  res.json({ success: true, state: autonomousBot.getState() });
+});
+
 // POST Close Current Open Trade manually at market
 app.post('/api/bot/close-position', async (req, res) => {
   if (autonomousBot.activePosition) {

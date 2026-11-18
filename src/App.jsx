@@ -315,6 +315,21 @@ export default function App() {
     }
   };
 
+  // Switch Trading Engine Mode ('DISCIPLINED' vs 'TURBO')
+  const handleSetTradingMode = async (mode) => {
+    try {
+      const res = await fetch('/api/bot/set-mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode })
+      });
+      const data = await res.json();
+      if (data.state) setBotState(data.state);
+    } catch (e) {
+      console.error('Set mode error:', e);
+    }
+  };
+
   // Native Browser Web Speech Fallback for Voice Announcements
   const speakTextNative = (text) => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window && text) {
@@ -2515,7 +2530,30 @@ export default function App() {
               </div>
 
               {/* Controls & Asset Switcher */}
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2">
+                {/* Engine Mode Switcher: Disciplined (1%) vs Turbo (5% Compounding) */}
+                <button
+                  onClick={() => handleSetTradingMode(botState?.tradingMode === 'TURBO' ? 'DISCIPLINED' : 'TURBO')}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition border cursor-pointer ${
+                    botState?.tradingMode === 'TURBO'
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/60 shadow-lg shadow-amber-500/20'
+                      : 'bg-zinc-800/80 text-zinc-300 border-zinc-700 hover:border-zinc-500'
+                  }`}
+                  title={botState?.tradingMode === 'TURBO' ? "Click to switch to 1% Safe Disciplined Mode" : "Click to switch to 5% Turbo 10x Compounding Mode"}
+                >
+                  {botState?.tradingMode === 'TURBO' ? (
+                    <>
+                      <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                      <span>🚀 Turbo (5% Risk)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>🛡️ Safe 1% Risk</span>
+                    </>
+                  )}
+                </button>
+
                 {/* Asset Dropdown */}
                 <select
                   value={botState?.activeAsset?.key || 'XAUUSD'}
@@ -2611,11 +2649,13 @@ export default function App() {
                     {botState?.dailyStats?.circuitBreakerTripped ? 'Shield Tripped' : 'Shield Active'}
                   </span>
                 </span>
-                <span className="text-sm font-mono font-bold text-indigo-400">
-                  1.0% / Trade • Target ₹5k+
+                <span className={`text-sm font-mono font-bold ${
+                  botState?.tradingMode === 'TURBO' ? 'text-amber-400' : 'text-indigo-400'
+                }`}>
+                  {botState?.tradingMode === 'TURBO' ? '5.0% / Trade • Turbo 10x' : '1.0% / Trade • Safe Shield'}
                 </span>
                 <span className="text-[10px] text-zinc-400">
-                  Today: {botState?.dailyStats?.tradesCount || 0}/4 trades ({botState?.dailyStats?.lossCount || 0}/2 losses)
+                  Today: {botState?.dailyStats?.tradesCount || 0}/10 trades ({botState?.dailyStats?.lossCount || 0}/2 losses)
                 </span>
               </div>
 
