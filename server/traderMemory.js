@@ -411,7 +411,7 @@ Only return valid JSON.`;
 
   // Pre-Trade Rule Verification: checks if setup violates any learned rules
   checkSetupAgainstRules(candidateSetup) {
-    const { type, rsi, price, ema20, dailyLossCount, dailyTradesCount } = candidateSetup;
+    const { type, rsi, price, ema20, dailyLossCount, dailyTradesCount, tradingMode } = candidateSetup;
 
     // Loop through ALL active learned rules (including Raj's rules and auto-learned rules)
     for (const ruleObj of this.learnedRules) {
@@ -429,15 +429,18 @@ Only return valid JSON.`;
         };
       }
 
-      // Check Overtrading: Max trades limit
-      if ((text.includes('quality over quantity') || text.includes('max 3-4') || text.includes('overtrading')) && (dailyTradesCount >= 4)) {
-        ruleObj.enforcedCount = (ruleObj.enforcedCount || 0) + 1;
-        this.saveMemory();
-        return {
-          allowed: false,
-          ruleId: ruleObj.id,
-          reason: `Rule Enforced [${ruleObj.source}]: "${ruleObj.rule}" (Max 4 trades completed today - sitting on hands)`
-        };
+      // Check Overtrading: Max trades limit (In Turbo mode, allow up to 20 trades for aggressive learning)
+      if ((text.includes('quality over quantity') || text.includes('max 3-4') || text.includes('overtrading'))) {
+        const tradeCap = tradingMode === 'TURBO' ? 20 : 4;
+        if (dailyTradesCount >= tradeCap) {
+          ruleObj.enforcedCount = (ruleObj.enforcedCount || 0) + 1;
+          this.saveMemory();
+          return {
+            allowed: false,
+            ruleId: ruleObj.id,
+            reason: `Rule Enforced [${ruleObj.source}]: "${ruleObj.rule}" (Max ${tradeCap} trades completed today - sitting on hands)`
+          };
+        }
       }
 
       // Check A: Overbought RSI rules

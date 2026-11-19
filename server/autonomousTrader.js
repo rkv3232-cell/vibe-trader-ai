@@ -130,10 +130,13 @@ export class AutonomousTrader {
     this.wasRunning = true;
     this.loadState();
 
-    // Auto-start 24/7 Autopilot immediately on boot
-    if (this.wasRunning !== false && process.env.AUTO_START_BOT !== 'false') {
+    // Auto-start 24/7 Autopilot immediately on boot so Render dyno sleep / reboot never leaves bot stuck in paused state
+    if (process.env.AUTO_START_BOT !== 'false') {
       setTimeout(() => {
-        if (!this.isRunning) this.start();
+        if (!this.isRunning) {
+          this.start();
+          console.log('🟢 [VibeTrader Engine] 24/7 Autopilot automatically started.');
+        }
       }, 1000);
     }
 
@@ -899,9 +902,10 @@ export class AutonomousTrader {
       return;
     }
 
-    // 2. Max Daily Trades Limit (10 quality disciplined trades per day)
-    if (this.dailyStats.tradesCount >= 10) {
-      this.scannerStatus = '🛡️ Max 10 disciplined trades reached for today. Sitting on hands to prevent overtrading.';
+    // 2. Max Daily Trades Limit (10 quality disciplined trades in Disciplined, 25 in Turbo Mode)
+    const maxTradesAllowed = this.tradingMode === 'TURBO' ? 25 : 10;
+    if (this.dailyStats.tradesCount >= maxTradesAllowed) {
+      this.scannerStatus = `🛡️ Max ${maxTradesAllowed} trades reached for today. Sitting on hands to prevent overtrading.`;
       if (Math.random() < 0.08) {
         this.addLog('RISK_SHIELD', this.scannerStatus);
       }
@@ -957,7 +961,6 @@ export class AutonomousTrader {
 
     if (triggerNow && setupType) {
       const type = setupType;
-      const riskAmount = Number((this.wallet.balance * this.riskPerTradePct).toFixed(2)); // 1% Risk (₹1,000)
 
       // Experience Check: Verify candidate setup against permanently learned rules
       const ruleCheck = traderMemory.checkSetupAgainstRules({
@@ -966,7 +969,8 @@ export class AutonomousTrader {
         price: currentPrice,
         ema20,
         dailyLossCount: this.dailyStats.lossCount,
-        dailyTradesCount: this.dailyStats.tradesCount
+        dailyTradesCount: this.dailyStats.tradesCount,
+        tradingMode: this.tradingMode
       });
       if (!ruleCheck.allowed) {
         this.scannerStatus = `🛡️ Safety Shield: ${ruleCheck.reason}`;
@@ -975,118 +979,155 @@ export class AutonomousTrader {
       }
       this.addLog('KNOWLEDGE', `✅ All ${traderMemory.learnedRules.length} learned rules verified. Risk & structure approved for ${type}.`);
 
-      const now = new Date();
-      const istDay = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay();
-      const isWeekend = (istDay === 0 || istDay === 6);
+      this.executeTradeOrder(type, currentPrice, ema9, ema20, rsi, trend, false);
+    }
+  }
 
-      // Adaptive Volatility Scalp Sizing (Optimized for active day trading):
-      let stopPct = 0.0020;
-      if (this.activeAssetKey === 'XAUUSD') {
-        stopPct = isWeekend ? 0.0010 : 0.0015;
-      } else if (this.activeAssetKey === 'BTCUSDT') {
-        stopPct = 0.0025;
-      } else if (this.activeAssetKey === 'SOLUSDT') {
-        stopPct = 0.0035;
-      } else if (this.activeAssetKey === 'ETHUSDT') {
-        stopPct = 0.0025;
-      }
+  // Execute a standardized virtual trade order (Used both autonomously & on instant manual trigger)
+  executeTradeOrder(type, currentPrice, ema9, ema20, rsi, trend, isForced = false) {
+    const asset = this.assets[this.activeAssetKey];
+    const riskAmount = Number((this.wallet.balance * this.riskPerTradePct).toFixed(2));
 
-      const stopDistance = Math.max(
-        Number((currentPrice * stopPct).toFixed(asset.decimals)),
-        asset.minMove * 10
-      );
-      const pointValue = Number((riskAmount / stopDistance).toFixed(4));
-      const targetDistance = Number((stopDistance * this.riskRewardRatio).toFixed(asset.decimals));
+    const now = new Date();
+    const istDay = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay();
+    const isWeekend = (istDay === 0 || istDay === 6);
 
-      const stopLoss = type === 'BUY'
-        ? Number((currentPrice - stopDistance).toFixed(asset.decimals))
-        : Number((currentPrice + stopDistance).toFixed(asset.decimals));
+    // Adaptive Volatility Scalp Sizing:
+    let stopPct = 0.0020;
+    if (this.activeAssetKey === 'XAUUSD') {
+      stopPct = isWeekend ? 0.0010 : 0.0015;
+    } else if (this.activeAssetKey === 'BTCUSDT') {
+      stopPct = 0.0025;
+    } else if (this.activeAssetKey === 'SOLUSDT') {
+      stopPct = 0.0035;
+    } else if (this.activeAssetKey === 'ETHUSDT') {
+      stopPct = 0.0025;
+    }
 
-      const targetPrice = type === 'BUY'
-        ? Number((currentPrice + targetDistance).toFixed(asset.decimals))
-        : Number((currentPrice - targetDistance).toFixed(asset.decimals));
+    const stopDistance = Math.max(
+      Number((currentPrice * stopPct).toFixed(asset.decimals)),
+      asset.minMove * 10
+    );
+    const pointValue = Number((riskAmount / stopDistance).toFixed(4));
+    const targetDistance = Number((stopDistance * this.riskRewardRatio).toFixed(asset.decimals));
 
-      // Compute Institutional Confluence Score (0 - 100) & Grade
-      let confluenceScore = 0;
-      const confluences = [];
+    const stopLoss = type === 'BUY'
+      ? Number((currentPrice - stopDistance).toFixed(asset.decimals))
+      : Number((currentPrice + stopDistance).toFixed(asset.decimals));
 
-      // 1. Trend Filter: Price respect to 20 EMA (+25 pts)
-      if (type === 'BUY' && currentPrice >= ema20 * 0.998) {
-        confluenceScore += 25;
-        confluences.push('20 EMA Uptrend Support');
-      } else if (type === 'SELL' && currentPrice <= ema20 * 1.002) {
-        confluenceScore += 25;
-        confluences.push('20 EMA Downtrend Resistance');
-      } else {
-        confluenceScore += 18;
-        confluences.push(`${type === 'BUY' ? 'Bullish' : 'Bearish'} Momentum Continuation`);
-      }
+    const targetPrice = type === 'BUY'
+      ? Number((currentPrice + targetDistance).toFixed(asset.decimals))
+      : Number((currentPrice - targetDistance).toFixed(asset.decimals));
 
-      // 2. Momentum Filter: Healthy RSI Range (+25 pts)
-      if ((type === 'BUY' && rsi >= 44 && rsi <= 68) || (type === 'SELL' && rsi >= 32 && rsi <= 56)) {
-        confluenceScore += 25;
-        confluences.push(`Healthy RSI Momentum (${rsi})`);
-      } else {
-        confluenceScore += 18;
-        confluences.push(`RSI Trend Flow (${rsi})`);
-      }
+    // Compute Institutional Confluence Score (0 - 100) & Grade
+    let confluenceScore = isForced ? 95 : 0;
+    const confluences = [];
 
-      // 3. Institutional Session Window (+20 pts)
-      const istHour = (now.getUTCHours() + 5 + Math.floor((now.getUTCMinutes() + 30) / 60)) % 24;
-      const isInstitutionalSession = (istHour >= 13 && istHour <= 17) || (istHour >= 18 && istHour <= 23);
-      if (isInstitutionalSession) {
-        confluenceScore += 20;
-        confluences.push('Institutional Session (London/NY)');
-      } else {
-        confluenceScore += 12;
-        confluences.push('Asian Session Setup');
-      }
+    // 1. Trend Filter: Price respect to 20 EMA (+25 pts)
+    if (type === 'BUY' && currentPrice >= (ema20 || currentPrice) * 0.998) {
+      if (!isForced) confluenceScore += 25;
+      confluences.push('20 EMA Uptrend Support');
+    } else if (type === 'SELL' && currentPrice <= (ema20 || currentPrice) * 1.002) {
+      if (!isForced) confluenceScore += 25;
+      confluences.push('20 EMA Downtrend Resistance');
+    } else {
+      if (!isForced) confluenceScore += 18;
+      confluences.push(`${type === 'BUY' ? 'Bullish' : 'Bearish'} Momentum Continuation`);
+    }
 
-      // 4. Learned Rules Clearance (+20 pts)
-      confluenceScore += 20;
-      confluences.push(`All ${traderMemory.learnedRules.length} Rules Obeyed`);
+    // 2. Momentum Filter: Healthy RSI Range (+25 pts)
+    if ((type === 'BUY' && rsi >= 44 && rsi <= 68) || (type === 'SELL' && rsi >= 32 && rsi <= 56)) {
+      if (!isForced) confluenceScore += 25;
+      confluences.push(`Healthy RSI Momentum (${rsi})`);
+    } else {
+      if (!isForced) confluenceScore += 18;
+      confluences.push(`RSI Trend Flow (${rsi})`);
+    }
 
-      // 5. Dynamic Trailing Uncapped Target (+10 pts)
-      confluenceScore += 10;
-      confluences.push('Uncapped ₹5,000+ Trailing Target');
+    // 3. Institutional Session Window (+20 pts)
+    const istHour = (now.getUTCHours() + 5 + Math.floor((now.getUTCMinutes() + 30) / 60)) % 24;
+    const isInstitutionalSession = (istHour >= 13 && istHour <= 17) || (istHour >= 18 && istHour <= 23);
+    if (isInstitutionalSession) {
+      if (!isForced) confluenceScore += 20;
+      confluences.push('Institutional Session (London/NY)');
+    } else {
+      if (!isForced) confluenceScore += 12;
+      confluences.push('Asian Session Setup');
+    }
 
-      const setupGrade = confluenceScore >= 90 ? 'A+' : confluenceScore >= 80 ? 'A' : 'B+';
+    // 4. Learned Rules Clearance (+20 pts)
+    if (!isForced) confluenceScore += 20;
+    confluences.push(`All ${traderMemory.learnedRules.length} Rules Obeyed`);
 
-      this.activePosition = {
-        id: `trade_${Date.now()}`,
-        assetKey: this.activeAssetKey,
-        symbol: asset.symbol,
-        assetName: asset.name,
-        type,
-        entryPrice: currentPrice,
-        currentPrice,
-        stopLoss,
-        initialStopLoss: stopLoss,
-        stopDistance,
-        pointValue,
-        targetPrice,
-        riskAmount,
-        targetProfit: Number((riskAmount * this.riskRewardRatio).toFixed(2)),
-        unrealizedPnL: 0,
-        unrealizedPnLPct: 0,
-        isTrailingActive: false,
-        trailingStage: 'INITIAL_RISK',
-        confluenceScore,
-        setupGrade,
-        confluences,
-        highestPnL: 0,
-        activeDecision: `Active ${type}: Monitoring 20 EMA & trailing momentum. Target: $${targetPrice}`,
-        openedTimestamp: Date.now(),
-        openedAt: new Date().toLocaleTimeString('en-IN', { hour12: false })
-      };
+    // 5. Dynamic Trailing Target (+10 pts)
+    if (!isForced) confluenceScore += 10;
+    confluences.push(isForced ? 'Instant Operator Trigger' : 'Uncapped Dynamic Trailing Target');
 
-      this.addLog(
-        'ORDER',
-        `🚀 EXECUTED VIRTUAL ${type}: ${asset.name} @ ${currentPrice} | Grade: ${setupGrade} (${confluenceScore}/100) | SL: ${stopLoss} | Target: ${targetPrice} (Uncapped Trailing Target: ₹4k–₹5k+)`
-      );
+    const setupGrade = confluenceScore >= 90 ? 'A+' : confluenceScore >= 80 ? 'A' : 'B+';
 
-      this.latestAnnouncement = `Raj bhai, maine ${asset.name} mein ${currentPrice} par virtual ${type === 'BUY' ? 'Buy (Long)' : 'Sell (Short)'} position open ki hai. Trailing engine active hai jo ₹4,000–₹5,000+ tak profit ride karega!`;
-      this.saveState();
+    this.activePosition = {
+      id: `trade_${Date.now()}`,
+      assetKey: this.activeAssetKey,
+      symbol: asset.symbol,
+      assetName: asset.name,
+      type,
+      entryPrice: currentPrice,
+      currentPrice,
+      stopLoss,
+      initialStopLoss: stopLoss,
+      stopDistance,
+      pointValue,
+      targetPrice,
+      riskAmount,
+      targetProfit: Number((riskAmount * this.riskRewardRatio).toFixed(2)),
+      unrealizedPnL: 0,
+      unrealizedPnLPct: 0,
+      isTrailingActive: false,
+      trailingStage: 'INITIAL_RISK',
+      confluenceScore,
+      setupGrade,
+      confluences,
+      highestPnL: 0,
+      activeDecision: `Active ${type}: Monitoring 20 EMA & trailing momentum. Target: $${targetPrice}`,
+      openedTimestamp: Date.now(),
+      openedAt: new Date().toLocaleTimeString('en-IN', { hour12: false })
+    };
+
+    this.addLog(
+      'ORDER',
+      `🚀 EXECUTED VIRTUAL ${type}: ${asset.name} @ ${currentPrice} | Grade: ${setupGrade} (${confluenceScore}/100) | SL: ${stopLoss} | Target: ${targetPrice} (${isForced ? '⚡ Instant Test' : 'Autonomous 20 EMA'})`
+    );
+
+    this.latestAnnouncement = `Raj bhai, maine ${asset.name} mein ${currentPrice} par virtual ${type === 'BUY' ? 'Buy (Long)' : 'Sell (Short)'} position open ki hai. Trailing engine active hai jo profit ride karega!`;
+    this.saveState();
+  }
+
+  // Force an Instant Virtual Trade (BUY or SELL based on current trend)
+  async forceInstantTrade() {
+    if (this.activePosition) {
+      return { success: false, message: 'Position already open! Close it or let trailing ride.', state: this.getState() };
+    }
+
+    if (!this.isRunning) {
+      this.start();
+    }
+
+    const currentPrice = await this.fetchLivePrice();
+    const struct = await this.fetchMarketStructure(this.activeAssetKey);
+    const ema9 = struct.ema9;
+    const ema20 = struct.ema20;
+    const rsi = struct.rsi;
+    const trend = struct.trend;
+
+    const setupType = (trend === 'BEARISH' || ema9 < ema20) ? 'SELL' : 'BUY';
+    this.executeTradeOrder(setupType, currentPrice, ema9, ema20, rsi, trend, true);
+
+    return {
+      success: true,
+      message: `Instant ${setupType} trade executed on ${this.assets[this.activeAssetKey].name} @ $${currentPrice}!`,
+      state: this.getState()
+    };
+  }
     }
   }
 

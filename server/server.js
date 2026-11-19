@@ -508,6 +508,12 @@ app.post('/api/bot/close-position', async (req, res) => {
   res.json({ success: true, state: autonomousBot.getState() });
 });
 
+// POST Trigger Instant Trade Test (Immediate Buy or Sell based on live trend)
+app.post('/api/bot/force-trade', async (req, res) => {
+  const result = await autonomousBot.forceInstantTrade();
+  res.json(result);
+});
+
 // ==========================================
 // AI EXPERIENCE & TRAINING BRAIN ENDPOINTS
 // ==========================================

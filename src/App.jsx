@@ -301,6 +301,16 @@ export default function App() {
     }
   };
 
+  const handleForceTrade = async () => {
+    try {
+      const res = await fetch('/api/bot/force-trade', { method: 'POST' });
+      const data = await res.json();
+      if (data.state) setBotState(data.state);
+    } catch (e) {
+      console.error('Force trade error:', e);
+    }
+  };
+
   const handleSetBotAsset = async (assetKey) => {
     try {
       const res = await fetch('/api/bot/set-asset', {
@@ -2786,9 +2796,18 @@ export default function App() {
                     title="Live TradingView Autonomous Browser View"
                   />
                   {/* Floating Chart Watermark */}
-                  <div className="absolute top-3 right-3 bg-zinc-950/80 border border-emerald-500/40 px-2.5 py-1 rounded-lg text-[10px] text-emerald-400 font-mono font-bold pointer-events-none flex items-center gap-1.5 backdrop-blur-md">
-                    <Activity className="w-3 h-3 animate-spin text-emerald-400" />
-                    <span>24/7 AI Scanner Hooked to Binance Live Stream</span>
+                  <div className="absolute top-3 right-3 bg-zinc-950/80 border border-emerald-500/40 px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold pointer-events-none flex items-center gap-1.5 backdrop-blur-md">
+                    {botState?.isRunning ? (
+                      <>
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span className="text-emerald-400">24/7 AI Scanner Live</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                        <span className="text-amber-300">Autopilot Paused</span>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -2902,28 +2921,67 @@ export default function App() {
                         )}
                       </div>
                     ) : (
-                      <div className="p-4 rounded-xl bg-zinc-950/50 border border-zinc-800/80 text-center flex flex-col items-center justify-center">
-                        <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400 mb-2 border border-emerald-500/30">
-                          <Activity className="w-4 h-4 animate-spin" />
-                        </div>
-                        <div className="text-xs font-semibold text-zinc-200 mb-1 flex items-center justify-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block"></span>
-                          {botState?.dailyStats?.circuitBreakerTripped
-                            ? '🛑 Daily Circuit Breaker Active'
-                            : botState?.isRunning
-                            ? '24/7 Market Radar Active'
-                            : 'Autopilot Paused'}
-                        </div>
-                        <div className="text-[11px] text-emerald-300 font-mono bg-zinc-900/90 px-3 py-1.5 rounded-lg border border-zinc-800 my-1.5 max-w-sm truncate">
-                          {botState?.scannerStatus || `Scanning ${botState?.activeAsset?.name || 'Gold'} • 20 EMA & RSI Momentum Setup`}
-                        </div>
-                        <div className="text-[10px] text-zinc-400 max-w-xs mt-0.5">
-                          {botState?.dailyStats?.circuitBreakerTripped
-                            ? 'Max 2 daily losses hit (-₹2,000 risk cap). Capital 100% protected until tomorrow.'
-                            : botState?.isRunning
-                            ? `Patience is edge: Only taking A+ Grade setups (Target: ₹4k–₹5k+) • Today: ${botState?.dailyStats?.tradesCount || 0}/4 trades.`
-                            : 'Click "Start 24/7 Autopilot" to let the bot trade automatically.'}
-                        </div>
+                      <div className="p-4 rounded-xl bg-zinc-950/70 border border-zinc-800 text-center flex flex-col items-center justify-center">
+                        {!botState?.isRunning ? (
+                          // ⏸️ CLEAR PAUSED STATE: Amber theme, NO spinning loader, big green action button
+                          <div className="flex flex-col items-center text-center py-2 px-3 w-full">
+                            <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-400 mb-2.5 border border-amber-500/30">
+                              <Pause className="w-6 h-6 fill-amber-400/20" />
+                            </div>
+                            <div className="text-sm font-bold text-amber-300 flex items-center gap-1.5 mb-1">
+                              <span>⏸️ 24/7 Autopilot Abhi Paused Hai</span>
+                            </div>
+                            <p className="text-[11px] text-zinc-400 max-w-sm mb-3">
+                              Bot ruka hua hai isliye trade nahi le raha. Autopilot shuru karne ke liye niche green button dabayein:
+                            </p>
+                            <button
+                              onClick={handleStartBot}
+                              className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-black font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-500/30 flex items-center gap-2 cursor-pointer transition transform active:scale-95 animate-pulse"
+                            >
+                              <Play className="w-4 h-4 fill-black" />
+                              <span>▶ Start 24/7 Autopilot (Abhi Shuru Karein)</span>
+                            </button>
+                          </div>
+                        ) : botState?.dailyStats?.circuitBreakerTripped ? (
+                          // 🛑 CIRCUIT BREAKER STATE
+                          <div className="flex flex-col items-center text-center py-2">
+                            <div className="w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-400 mb-2 border border-rose-500/30">
+                              <AlertCircle className="w-6 h-6" />
+                            </div>
+                            <div className="text-xs font-bold text-rose-400 mb-1">
+                              🛑 Daily Circuit Breaker Active
+                            </div>
+                            <div className="text-[10px] text-zinc-400 max-w-xs mt-0.5">
+                              Max 2 daily losses hit (-₹2,000 risk cap). Capital 100% protected until tomorrow.
+                            </div>
+                          </div>
+                        ) : (
+                          // 🟢 ACTIVE RUNNING & RADAR HUNTING STATE
+                          <div className="flex flex-col items-center text-center w-full">
+                            <div className="relative flex items-center justify-center w-11 h-11 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-emerald-400 mb-2">
+                              <Radio className="w-5 h-5 text-emerald-400 animate-pulse" />
+                              <span className="absolute w-full h-full rounded-full border border-emerald-500/40 animate-ping"></span>
+                            </div>
+                            <div className="text-xs font-semibold text-zinc-200 mb-1 flex items-center justify-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block"></span>
+                              <span>24/7 Market Radar Active — Hunting A+ Setup</span>
+                            </div>
+                            <div className="text-[11px] text-emerald-300 font-mono bg-zinc-900/90 px-3 py-1.5 rounded-lg border border-zinc-800 my-1.5 max-w-md truncate">
+                              {botState?.scannerStatus || `Scanning ${botState?.activeAsset?.name || 'Gold'} • 20 EMA & RSI Momentum Setup`}
+                            </div>
+                            <div className="text-[10px] text-zinc-400 max-w-sm mt-1 flex items-center justify-center gap-2">
+                              <span>Target: ₹4k–₹12k+ • Today: {botState?.dailyStats?.tradesCount || 0} trades</span>
+                              <span>•</span>
+                              <button
+                                onClick={handleForceTrade}
+                                className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 underline cursor-pointer hover:bg-emerald-500/10 px-1.5 py-0.5 rounded transition"
+                                title="Abhi turant live EMA trend par instant trade execute karein"
+                              >
+                                ⚡ Instant Trade Test
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
