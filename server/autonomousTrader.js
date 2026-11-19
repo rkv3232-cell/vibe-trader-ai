@@ -796,10 +796,12 @@ export class AutonomousTrader {
     if (isWin) {
       this.dailyStats.winCount += 1;
     } else {
-      // Only full stop losses (or heavy losses >= ₹800) count toward the 2-loss daily circuit breaker
-      if (reason === 'STOP_LOSS_HIT' || Math.abs(finalPnL) >= 800) {
+      // Only full stop losses (or heavy losses >= 70% of risk) count toward the daily circuit breaker
+      const maxLossCount = this.tradingMode === 'TURBO' ? 3 : 2;
+      const heavyLossThreshold = (this.wallet.balance * this.riskPerTradePct * 0.7) || 800;
+      if (reason === 'STOP_LOSS_HIT' || Math.abs(finalPnL) >= heavyLossThreshold) {
         this.dailyStats.lossCount += 1;
-        if (this.dailyStats.lossCount >= 2) {
+        if (this.dailyStats.lossCount >= maxLossCount) {
           this.dailyStats.circuitBreakerTripped = true;
         }
       }
@@ -980,6 +982,43 @@ export class AutonomousTrader {
       this.addLog('KNOWLEDGE', `✅ All ${traderMemory.learnedRules.length} learned rules verified. Risk & structure approved for ${type}.`);
 
       this.executeTradeOrder(type, currentPrice, ema9, ema20, rsi, trend, false);
+      return;
+    }
+
+    // 4. Secondary Cross-Market Radar: If primary market has no active setup, scan BTC, ETH, SOL for high-momentum opportunities
+    if (!setupType) {
+      const otherAssetKeys = Object.keys(this.assets).filter(k => k !== this.activeAssetKey);
+      for (const altKey of otherAssetKeys) {
+        try {
+          const altStruct = await this.fetchMarketStructure(altKey);
+          const altPrice = altStruct.price;
+          const altEma9 = altStruct.ema9;
+          const altEma20 = altStruct.ema20;
+          const altRsi = altStruct.rsi;
+          const altTrend = altStruct.trend;
+
+          const isAltBearish = (altTrend === 'BEARISH' || altEma9 <= altEma20) &&
+            (altPrice <= altEma20 * 1.004) &&
+            (altRsi <= 58 && altRsi >= 25);
+
+          const isAltBullish = (altTrend === 'BULLISH' || altEma9 >= altEma20) &&
+            (altPrice >= altEma20 * 0.996) &&
+            (altRsi >= 42 && altRsi <= 75);
+
+          let altSetup = null;
+          if (isAltBearish && !isAltBullish) altSetup = 'SELL';
+          else if (isAltBullish && !isAltBearish) altSetup = 'BUY';
+          else if (isAltBearish && isAltBullish) altSetup = altEma9 < altEma20 ? 'SELL' : 'BUY';
+
+          if (altSetup && Math.random() < 0.60) {
+            this.setAsset(altKey);
+            this.executeTradeOrder(altSetup, altPrice, altEma9, altEma20, altRsi, altTrend, false);
+            return;
+          }
+        } catch (e) {
+          // Continue scanning next market
+        }
+      }
     }
   }
 

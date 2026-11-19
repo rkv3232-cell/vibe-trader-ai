@@ -418,14 +418,15 @@ Only return valid JSON.`;
       if (!ruleObj.active) continue;
       const text = (ruleObj.rule || '').toLowerCase();
 
-      // Check Circuit Breaker: 2 stop losses in a day
-      if ((text.includes('circuit breaker') || text.includes('2 consecutive stop') || text.includes('halt all new')) && (dailyLossCount >= 2)) {
+      // Check Circuit Breaker: 2 stop losses in a day (3 in Turbo Mode for breathing room)
+      const maxLossAllowed = tradingMode === 'TURBO' ? 3 : 2;
+      if ((text.includes('circuit breaker') || text.includes('2 consecutive stop') || text.includes('halt all new')) && (dailyLossCount >= maxLossAllowed)) {
         ruleObj.enforcedCount = (ruleObj.enforcedCount || 0) + 1;
         this.saveMemory();
         return {
           allowed: false,
           ruleId: ruleObj.id,
-          reason: `Rule Enforced [${ruleObj.source}]: "${ruleObj.rule}" (2 Daily Losses hit - trading paused to protect capital)`
+          reason: `Rule Enforced [${ruleObj.source}]: "${ruleObj.rule}" (${maxLossAllowed} Daily Losses hit - trading paused to protect capital)`
         };
       }
 
