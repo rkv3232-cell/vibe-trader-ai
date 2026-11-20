@@ -2564,19 +2564,13 @@ export default function App() {
                   )}
                 </button>
 
-                {/* Asset Dropdown (Crypto, Commodities, Indian Stock Market NSE & US NASDAQ) */}
+                {/* Dedicated Focus Asset: 🇮🇳 Nifty 50 Index (NSE) */}
                 <select
-                  value={botState?.activeAsset?.key || 'XAUUSD'}
-                  onChange={(e) => handleSetBotAsset(e.target.value)}
-                  className="bg-zinc-800/90 border border-zinc-700 text-zinc-200 text-xs rounded-lg px-2.5 py-1.5 font-semibold focus:outline-none cursor-pointer hover:border-emerald-500/50 transition"
+                  value="NIFTY50"
+                  disabled
+                  className="bg-zinc-800/90 border border-emerald-500/50 text-emerald-300 text-xs rounded-lg px-2.5 py-1.5 font-bold focus:outline-none cursor-default shadow-sm"
                 >
-                  <option value="XAUUSD">🥇 Gold (PAXG/USD) [24/7]</option>
-                  <option value="BTCUSDT">₿ Bitcoin (BTC/USD) [24/7]</option>
-                  <option value="ETHUSDT">Ξ Ethereum (ETH/USD) [24/7]</option>
-                  <option value="SOLUSDT">◎ Solana (SOL/USD) [24/7]</option>
-                  <option value="NIFTY50">🇮🇳 Nifty 50 Index (NSE)</option>
-                  <option value="RELIANCE">🇮🇳 Reliance Ind (NSE)</option>
-                  <option value="TSLA">🇺🇸 Tesla Inc (NASDAQ)</option>
+                  <option value="NIFTY50">🇮🇳 Nifty 50 Index (NSE) [Exclusive AI Trader]</option>
                 </select>
 
                 {/* Start / Pause Autopilot Button */}
@@ -2719,29 +2713,14 @@ export default function App() {
 
               {/* Multi-Market Radar Strip (Click to Switch Asset) */}
               <div className="flex items-center gap-1.5 overflow-x-auto max-w-full text-[11px] font-mono">
-                <span className="text-[10px] text-zinc-500 font-sans uppercase font-bold mr-1">Markets:</span>
-                {Object.values(botState?.marketRadar || {
-                  XAUUSD: { key: 'XAUUSD', name: 'Gold', price: 4096.50 },
-                  BTCUSDT: { key: 'BTCUSDT', name: 'Bitcoin', price: 91800.00 },
-                  ETHUSDT: { key: 'ETHUSDT', name: 'Ethereum', price: 3380.00 },
-                  SOLUSDT: { key: 'SOLUSDT', name: 'Solana', price: 184.50 }
-                }).map((m) => (
-                  <button
-                    key={m.key}
-                    onClick={() => handleSetBotAsset(m.key)}
-                    className={`px-2 py-0.5 rounded-lg border text-[10.5px] transition cursor-pointer flex items-center gap-1 ${
-                      botState?.activeAsset?.key === m.key
-                        ? 'bg-emerald-950/70 border-emerald-500 text-emerald-300 font-bold shadow-sm'
-                        : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
-                    }`}
-                  >
-                    <span>{m.name}</span>
-                    <span className="text-zinc-500">•</span>
-                    <span className={botState?.activeAsset?.key === m.key ? 'text-emerald-400' : 'text-zinc-300'}>
-                      {m.currency || '$'}{m.price}
-                    </span>
-                  </button>
-                ))}
+                <span className="text-[10px] text-zinc-500 font-sans uppercase font-bold mr-1">Active Market:</span>
+                <div className="px-2.5 py-0.5 rounded-lg border border-emerald-500 bg-emerald-950/70 text-[10.5px] font-bold text-emerald-300 flex items-center gap-1.5 shadow-sm">
+                  <span>🇮🇳 Nifty 50 Index (NSE)</span>
+                  <span className="text-zinc-500">•</span>
+                  <span className="text-emerald-400">
+                    ₹{botState?.livePrice || 25800.60}
+                  </span>
+                </div>
               </div>
             </div>
 

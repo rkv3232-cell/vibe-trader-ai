@@ -25,52 +25,8 @@ export class AutonomousTrader {
     this.intervalId = null;
     this.cycleSeconds = 6; // Evaluates live market every 6 seconds
 
-    // Supported live assets: 24/7 Commodities, Crypto, and Global Stock Markets (NSE / NASDAQ)
+    // Dedicated Exclusive Asset: 🇮🇳 Nifty 50 Index (NSE)
     this.assets = {
-      XAUUSD: {
-        name: 'Gold (PAXG/USD)',
-        symbol: 'PAXGUSDT',
-        tvSymbol: 'BINANCE:PAXGUSDT',
-        coinbasePair: 'PAXG-USD',
-        krakenPair: 'PAXGUSD',
-        decimals: 2,
-        minMove: 0.1,
-        type: 'COMMODITY',
-        currency: '$'
-      },
-      BTCUSDT: {
-        name: 'Bitcoin (BTC/USD)',
-        symbol: 'BTCUSDT',
-        tvSymbol: 'BINANCE:BTCUSDT',
-        coinbasePair: 'BTC-USD',
-        krakenPair: 'XBTUSD',
-        decimals: 2,
-        minMove: 1.0,
-        type: 'CRYPTO',
-        currency: '$'
-      },
-      ETHUSDT: {
-        name: 'Ethereum (ETH/USD)',
-        symbol: 'ETHUSDT',
-        tvSymbol: 'BINANCE:ETHUSDT',
-        coinbasePair: 'ETH-USD',
-        krakenPair: 'ETHUSD',
-        decimals: 2,
-        minMove: 0.5,
-        type: 'CRYPTO',
-        currency: '$'
-      },
-      SOLUSDT: {
-        name: 'Solana (SOL/USD)',
-        symbol: 'SOLUSDT',
-        tvSymbol: 'BINANCE:SOLUSDT',
-        coinbasePair: 'SOL-USD',
-        krakenPair: 'SOLUSD',
-        decimals: 2,
-        minMove: 0.05,
-        type: 'CRYPTO',
-        currency: '$'
-      },
       NIFTY50: {
         name: 'Nifty 50 Index (NSE)',
         symbol: 'NIFTY50',
@@ -81,33 +37,11 @@ export class AutonomousTrader {
         type: 'STOCK_INDEX',
         currency: '₹',
         marketHours: '09:15-15:30'
-      },
-      RELIANCE: {
-        name: 'Reliance Industries (NSE)',
-        symbol: 'RELIANCE',
-        tvSymbol: 'BSE:RELIANCE',
-        yahooTicker: 'RELIANCE.NS',
-        decimals: 2,
-        minMove: 0.25,
-        type: 'STOCK',
-        currency: '₹',
-        marketHours: '09:15-15:30'
-      },
-      TSLA: {
-        name: 'Tesla Inc (NASDAQ)',
-        symbol: 'TSLA',
-        tvSymbol: 'NASDAQ:TSLA',
-        yahooTicker: 'TSLA',
-        decimals: 2,
-        minMove: 0.1,
-        type: 'STOCK',
-        currency: '$',
-        marketHours: '19:00-01:30'
       }
     };
 
-    this.activeAssetKey = 'XAUUSD';
-    this.livePrice = 4096.50;
+    this.activeAssetKey = 'NIFTY50';
+    this.livePrice = 25800.60;
     this.priceHistory = [];
 
     // Virtual Wallet State (Initial Capital: ₹1,00,000 INR)
@@ -150,12 +84,9 @@ export class AutonomousTrader {
     // Indicator history for EMA / RSI calculations
     this.priceTicks = [];
 
-    // Multi-Asset Institutional Radar (Live spot prices across all 4 markets)
+    // Dedicated Nifty 50 Institutional Radar
     this.marketRadar = {
-      XAUUSD: { key: 'XAUUSD', name: 'Gold', symbol: 'PAXGUSDT', price: 4096.50 },
-      BTCUSDT: { key: 'BTCUSDT', name: 'Bitcoin', symbol: 'BTCUSDT', price: 91800.00 },
-      ETHUSDT: { key: 'ETHUSDT', name: 'Ethereum', symbol: 'ETHUSDT', price: 3380.00 },
-      SOLUSDT: { key: 'SOLUSDT', name: 'Solana', symbol: 'SOLUSDT', price: 184.50 }
+      NIFTY50: { key: 'NIFTY50', name: 'Nifty 50', symbol: 'NIFTY50', price: 25800.60, currency: '₹' }
     };
 
     // Daily Performance & Circuit Breaker Tracking (reset each day in Asia/Kolkata)
@@ -258,7 +189,11 @@ export class AutonomousTrader {
           this.riskRewardRatio = data.tradingMode === 'TURBO' ? 2.5 : 2.0;
         }
         if (data.activePosition !== undefined) this.activePosition = data.activePosition;
-        if (data.activeAssetKey) this.activeAssetKey = data.activeAssetKey;
+        if (data.activeAssetKey && this.assets[data.activeAssetKey]) {
+          this.activeAssetKey = data.activeAssetKey;
+        } else {
+          this.activeAssetKey = 'NIFTY50';
+        }
         if (Array.isArray(data.logs)) this.logs = data.logs.slice(-30);
         if (data.dailyStats) {
           this.dailyStats = { ...this.dailyStats, ...data.dailyStats };
@@ -1386,18 +1321,22 @@ Write 1 brief insight (Hinglish/English, under 20 words) analyzing current insti
   // Get full state representation for API
   getState() {
     this.updateWalletEquity();
-    const asset = this.assets[this.activeAssetKey];
+    const asset = this.assets[this.activeAssetKey] || this.assets['NIFTY50'];
     return {
       isRunning: this.isRunning,
       activeAsset: {
-        key: this.activeAssetKey,
-        name: asset?.name || 'Gold',
-        symbol: asset?.symbol || 'PAXGUSDT'
+        key: this.activeAssetKey || 'NIFTY50',
+        name: asset?.name || 'Nifty 50 Index (NSE)',
+        symbol: asset?.symbol || 'NIFTY50',
+        tvSymbol: asset?.tvSymbol || 'NSE:NIFTY',
+        currency: asset?.currency || '₹'
       },
       availableAssets: Object.entries(this.assets).map(([key, val]) => ({
         key,
         name: val.name,
-        symbol: val.symbol
+        symbol: val.symbol,
+        tvSymbol: val.tvSymbol,
+        currency: val.currency
       })),
       livePrice: this.livePrice,
       wallet: this.wallet,

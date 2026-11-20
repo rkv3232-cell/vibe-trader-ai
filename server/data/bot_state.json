@@ -1,5 +1,5 @@
 {
-  "isRunning": false,
+  "isRunning": true,
   "tradingMode": "TURBO",
   "riskPerTradePct": 0.05,
   "riskRewardRatio": 2.5,
@@ -36,7 +36,7 @@
       "closedAt": "21:51:34"
     }
   ],
-  "activeAssetKey": "XAUUSD",
+  "activeAssetKey": "NIFTY50",
   "dailyStats": {
     "date": "2026-11-18",
     "tradesCount": 0,
