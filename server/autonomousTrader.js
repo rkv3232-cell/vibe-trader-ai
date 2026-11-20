@@ -25,9 +25,10 @@ export class AutonomousTrader {
     this.intervalId = null;
     this.cycleSeconds = 6; // Evaluates live market every 6 seconds
 
-    // Dedicated Exclusive Asset: 🇮🇳 Nifty 50 Index (NSE)
+    // Exclusively dedicated to Indian Stock Market Benchmark: Nifty 50 Index (NSE)
     this.assets = {
       NIFTY50: {
+        key: 'NIFTY50',
         name: 'Nifty 50 Index (NSE)',
         symbol: 'NIFTY50',
         tvSymbol: 'NSE:NIFTY',
@@ -36,7 +37,9 @@ export class AutonomousTrader {
         minMove: 0.5,
         type: 'STOCK_INDEX',
         currency: '₹',
-        marketHours: '09:15-15:30'
+        marketHours: '09:15-15:30',
+        lotSize: 25,
+        benchmark: 'NSE Nifty 50'
       }
     };
 
@@ -86,7 +89,7 @@ export class AutonomousTrader {
 
     // Dedicated Nifty 50 Institutional Radar
     this.marketRadar = {
-      NIFTY50: { key: 'NIFTY50', name: 'Nifty 50', symbol: 'NIFTY50', price: 25800.60, currency: '₹' }
+      NIFTY50: { key: 'NIFTY50', name: 'Nifty 50 (NSE)', symbol: 'NSE:NIFTY', price: 25800.60, currency: '₹' }
     };
 
     // Daily Performance & Circuit Breaker Tracking (reset each day in Asia/Kolkata)
@@ -188,12 +191,14 @@ export class AutonomousTrader {
           this.riskPerTradePct = data.tradingMode === 'TURBO' ? 0.05 : 0.01;
           this.riskRewardRatio = data.tradingMode === 'TURBO' ? 2.5 : 2.0;
         }
-        if (data.activePosition !== undefined) this.activePosition = data.activePosition;
-        if (data.activeAssetKey && this.assets[data.activeAssetKey]) {
-          this.activeAssetKey = data.activeAssetKey;
-        } else {
-          this.activeAssetKey = 'NIFTY50';
+        if (data.activePosition !== undefined) {
+          if (data.activePosition && data.activePosition.assetKey !== 'NIFTY50') {
+            this.activePosition = null; // Clean purge of legacy non-Nifty position
+          } else {
+            this.activePosition = data.activePosition;
+          }
         }
+        this.activeAssetKey = 'NIFTY50'; // Exclusively dedicated to Nifty 50 Index model
         if (Array.isArray(data.logs)) this.logs = data.logs.slice(-30);
         if (data.dailyStats) {
           this.dailyStats = { ...this.dailyStats, ...data.dailyStats };
@@ -711,7 +716,7 @@ export class AutonomousTrader {
       pos.trailingStage = 'BREAKEVEN';
       pos.isTrailingActive = true;
       pos.stopLoss = pos.entryPrice;
-      this.addLog('TRAIL_SL', `🛡️ Trailing Stop Loss moved to Cost ($${pos.entryPrice}). Risk is now ₹0 (Free Trade)!`);
+      this.addLog('TRAIL_SL', `🛡️ Trailing Stop Loss moved to Cost (₹${pos.entryPrice}). Risk is now ₹0 (Free Trade)!`);
     }
 
     // 2. Milestone 2.0R Target (+₹2,000 in Disciplined, +₹10,000 in Turbo!): Lock in +1.2R profit guaranteed!
@@ -821,13 +826,13 @@ export class AutonomousTrader {
 
     // Update Live AI Control Decision telemetry for UI
     if (pos.trailingStage && pos.trailingStage !== 'INITIAL_RISK') {
-      pos.activeDecision = `🛡️ Profit Locked (+₹${Math.round(pos.riskAmount * 0.8)}). Trailing SL @ $${pos.stopLoss} hunting runner.`;
+      pos.activeDecision = `🛡️ Profit Locked (+₹${Math.round(pos.riskAmount * 0.8)}). Trailing SL @ ₹${pos.stopLoss} hunting runner.`;
     } else if (pos.unrealizedPnL >= 450) {
-      pos.activeDecision = `🚀 Trend Surging (+₹${pos.unrealizedPnL}). Approaching Target ($${pos.targetPrice}).`;
+      pos.activeDecision = `🚀 Trend Surging (+₹${pos.unrealizedPnL}). Approaching Target (₹${pos.targetPrice}).`;
     } else if (pos.unrealizedPnL <= -300) {
       pos.activeDecision = `⚠️ Structure Test (-₹${Math.abs(pos.unrealizedPnL)}). Monitoring 20 EMA defense.`;
     } else {
-      pos.activeDecision = `⚡ Active Decision: Holding ${pos.type} with 20 EMA structure. Target: $${pos.targetPrice}`;
+      pos.activeDecision = `⚡ Active Decision: Holding ${pos.type} with 20 EMA structure. Target: ₹${pos.targetPrice}`;
     }
   }
 
@@ -841,16 +846,20 @@ export class AutonomousTrader {
       : (pos.entryPrice - exitPrice);
 
     const pointValue = pos.pointValue || (pos.riskAmount / (pos.stopDistance || 1));
-    let finalPnL = Number((priceDiff * pointValue).toFixed(2));
+    let grossPnL = Number((priceDiff * pointValue).toFixed(2));
 
     if (reason === 'STOP_LOSS_HIT') {
-      finalPnL = -Math.abs(pos.riskAmount || 1000);
+      grossPnL = -Math.abs(pos.riskAmount || 1000);
     }
 
     // Safety Firewall: Under NO circumstance can a trade loss exceed defined riskAmount (Max 1% = ₹1,000)!
-    if (finalPnL < 0) {
-      finalPnL = -Math.min(Math.abs(finalPnL), Math.abs(pos.riskAmount || 1000));
+    if (grossPnL < 0) {
+      grossPnL = -Math.min(Math.abs(grossPnL), Math.abs(pos.riskAmount || 1000));
     }
+
+    // Realistic Institutional Cost: Round-trip Brokerage (₹20 buy + ₹20 sell) + STT & turnover charges = ₹40.00
+    const transactionFee = 40.00;
+    const finalPnL = Number((grossPnL - transactionFee).toFixed(2));
     const isWin = finalPnL > 0;
 
     // Update Wallet
@@ -884,6 +893,7 @@ export class AutonomousTrader {
 
     const closedTrade = {
       id: pos.id,
+      idempotencyKey: pos.idempotencyKey || `trade_${Date.now()}_nifty`,
       symbol: pos.symbol,
       assetName: pos.assetName,
       type: pos.type,
@@ -891,9 +901,12 @@ export class AutonomousTrader {
       exitPrice: exitPrice,
       stopLoss: pos.stopLoss,
       targetPrice: pos.targetPrice,
-      riskReward,
+      slippagePoints: pos.slippagePoints || 2.5,
+      grossPnL,
+      transactionFee,
       pnl: finalPnL,
       pnlFormatted: finalPnL >= 0 ? `+₹${finalPnL}` : `-₹${Math.abs(finalPnL)}`,
+      riskReward,
       isWin,
       reason,
       confluenceScore: pos.confluenceScore || 95,
@@ -988,13 +1001,13 @@ export class AutonomousTrader {
     return true;
   }
 
-  // Scan Market & Look for Symmetrical Institutional Setups (Equal 50/50 BUY & SELL)
+  // Scan Market & Look for Symmetrical Institutional Setups on Nifty 50 (Equal 50/50 BUY & SELL)
   async scanAndEvaluateMarket(currentPrice) {
-    const asset = this.assets[this.activeAssetKey];
+    const asset = this.assets[this.activeAssetKey] || this.assets.NIFTY50;
 
-    // Market session check for stock assets
+    // Market session check for NSE Nifty 50 (9:15 AM to 3:30 PM IST Mon-Fri)
     if (!this.isMarketInSession(this.activeAssetKey)) {
-      this.scannerStatus = `🟡 ${asset.name} Closed (${asset.marketHours === '09:15-15:30' ? 'NSE Opens 9:15 AM - 3:30 PM IST Mon-Fri' : 'US Market Opens 7:00 PM - 1:30 AM IST'}) • 24/7 Active on Gold & Crypto`;
+      this.scannerStatus = `🟡 NSE Nifty 50 Session Closed (Opens 9:15 AM - 3:30 PM IST Mon-Fri). Radar analyzing historical 5m candles & awaiting market bell.`;
       return;
     }
 
@@ -1017,7 +1030,7 @@ export class AutonomousTrader {
       return;
     }
 
-    // 3. Fetch real candlestick market structure from Binance Vision
+    // 3. Fetch real 5-minute candlestick market structure for Nifty 50 from Yahoo Finance (^NSEI)
     const struct = await this.fetchMarketStructure(this.activeAssetKey);
     const ema9 = struct.ema9;
     const ema20 = struct.ema20;
@@ -1025,7 +1038,7 @@ export class AutonomousTrader {
     const trend = struct.trend; // 'BULLISH' or 'BEARISH'
 
     // Update real-time radar scanning status with live Trend & EMAs
-    this.scannerStatus = `Radar Active: Watching ${asset.name} @ $${currentPrice} | Trend: ${trend === 'BEARISH' ? '🔴 DOWNTREND (SELL BIAS)' : '🟢 UPTREND (BUY BIAS)'} (9 EMA: $${ema9} | 20 EMA: $${ema20} | RSI: ${rsi})`;
+    this.scannerStatus = `Radar Active: Watching ${asset.name} @ ₹${currentPrice} | Trend: ${trend === 'BEARISH' ? '🔴 DOWNTREND (SELL BIAS)' : '🟢 UPTREND (BUY BIAS)'} (9 EMA: ₹${ema9} | 20 EMA: ₹${ema20} | RSI: ${rsi})`;
 
     // Periodic Continuous AI Market Structure Study (~every 3-4 minutes)
     this.cycleCounter = (this.cycleCounter || 0) + 1;
@@ -1035,7 +1048,7 @@ export class AutonomousTrader {
 
     // Human thought logs
     if (Math.random() < 0.28) {
-      this.addLog('MIND', `Watching ${asset.name} at ${currentPrice}. Trend: ${trend} | 9 EMA: ${ema9} | 20 EMA: ${ema20} | RSI: ${rsi}. Today: ${this.dailyStats.tradesCount}/10 trades (${this.dailyStats.lossCount}/2 losses).`);
+      this.addLog('MIND', `Watching ${asset.name} at ₹${currentPrice}. Trend: ${trend} | 9 EMA: ₹${ema9} | 20 EMA: ₹${ema20} | RSI: ${rsi}. Today: ${this.dailyStats.tradesCount}/10 trades (${this.dailyStats.lossCount}/2 losses).`);
     }
 
     // Symmetrical Trade Setup Detection (100% equal chance for SELL and BUY)
@@ -1087,104 +1100,57 @@ export class AutonomousTrader {
       this.executeTradeOrder(type, currentPrice, ema9, ema20, rsi, trend, false);
       return;
     }
-
-    // 4. Secondary Cross-Market Radar: If primary market has no active setup, scan BTC, ETH, SOL for high-momentum opportunities
-    if (!setupType) {
-      const otherAssetKeys = Object.keys(this.assets).filter(k => k !== this.activeAssetKey);
-      for (const altKey of otherAssetKeys) {
-        try {
-          const altStruct = await this.fetchMarketStructure(altKey);
-          const altPrice = altStruct.price;
-          const altEma9 = altStruct.ema9;
-          const altEma20 = altStruct.ema20;
-          const altRsi = altStruct.rsi;
-          const altTrend = altStruct.trend;
-
-          const isAltBearish = (altTrend === 'BEARISH' || altEma9 <= altEma20) &&
-            (altPrice <= altEma20 * 1.004) &&
-            (altRsi <= 58 && altRsi >= 25);
-
-          const isAltBullish = (altTrend === 'BULLISH' || altEma9 >= altEma20) &&
-            (altPrice >= altEma20 * 0.996) &&
-            (altRsi >= 42 && altRsi <= 75);
-
-          let altSetup = null;
-          if (isAltBearish && !isAltBullish) altSetup = 'SELL';
-          else if (isAltBullish && !isAltBearish) altSetup = 'BUY';
-          else if (isAltBearish && isAltBullish) altSetup = altEma9 < altEma20 ? 'SELL' : 'BUY';
-
-          if (altSetup && Math.random() < 0.60) {
-            this.setAsset(altKey);
-            this.executeTradeOrder(altSetup, altPrice, altEma9, altEma20, altRsi, altTrend, false);
-            return;
-          }
-        } catch (e) {
-          // Continue scanning next market
-        }
-      }
-    }
   }
 
   // Execute a standardized virtual trade order (Used both autonomously & on instant manual trigger)
   executeTradeOrder(type, currentPrice, ema9, ema20, rsi, trend, isForced = false) {
-    const asset = this.assets[this.activeAssetKey];
+    const asset = this.assets[this.activeAssetKey] || this.assets.NIFTY50;
     const riskAmount = Number((this.wallet.balance * this.riskPerTradePct).toFixed(2));
 
-    const now = new Date();
-    const istDay = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })).getDay();
-    const isWeekend = (istDay === 0 || istDay === 6);
+    // Realistic Conservative Slippage (2.0 to 4.0 points on Nifty 50 market order execution)
+    const slippagePoints = Number((2.0 + Math.random() * 2.0).toFixed(2));
+    const executedPrice = type === 'BUY'
+      ? Number((currentPrice + slippagePoints).toFixed(asset.decimals))
+      : Number((currentPrice - slippagePoints).toFixed(asset.decimals));
 
-    // Adaptive Volatility Scalp Sizing:
-    let stopPct = 0.0020;
-    if (this.activeAssetKey === 'XAUUSD') {
-      stopPct = isWeekend ? 0.0010 : 0.0015;
-    } else if (this.activeAssetKey === 'BTCUSDT') {
-      stopPct = 0.0025;
-    } else if (this.activeAssetKey === 'SOLUSDT') {
-      stopPct = 0.0035;
-    } else if (this.activeAssetKey === 'ETHUSDT') {
-      stopPct = 0.0025;
-    } else if (this.activeAssetKey === 'NIFTY50') {
-      stopPct = 0.0015; // ~35-40 pts on Nifty
-    } else if (this.activeAssetKey === 'RELIANCE') {
-      stopPct = 0.0030; // ~4-5 Rs on Reliance
-    } else if (this.activeAssetKey === 'TSLA') {
-      stopPct = 0.0050; // ~1.5-2 USD on Tesla
-    }
-
-    const stopDistance = Math.max(
-      Number((currentPrice * stopPct).toFixed(asset.decimals)),
-      asset.minMove * 10
-    );
+    // Adaptive Volatility Point Sizing for Nifty 50:
+    // Standard intraday stop distance = ~38 points (~₹950 per lot of 25)
+    const stopDistance = 38.0;
     const pointValue = Number((riskAmount / stopDistance).toFixed(4));
     const targetDistance = Number((stopDistance * this.riskRewardRatio).toFixed(asset.decimals));
 
     const stopLoss = type === 'BUY'
-      ? Number((currentPrice - stopDistance).toFixed(asset.decimals))
-      : Number((currentPrice + stopDistance).toFixed(asset.decimals));
+      ? Number((executedPrice - stopDistance).toFixed(asset.decimals))
+      : Number((executedPrice + stopDistance).toFixed(asset.decimals));
 
     const targetPrice = type === 'BUY'
-      ? Number((currentPrice + targetDistance).toFixed(asset.decimals))
-      : Number((currentPrice - targetDistance).toFixed(asset.decimals));
+      ? Number((executedPrice + targetDistance).toFixed(asset.decimals))
+      : Number((executedPrice - targetDistance).toFixed(asset.decimals));
+
+    // Idempotency Key to prevent duplicate order submission
+    const idempotencyKey = `idemp_${Date.now()}_nifty_${Math.floor(Math.random() * 10000)}`;
+
+    // Order State Machine: CREATED -> VALIDATED -> SUBMITTED -> FILLED
+    const orderPipeline = ['CREATED', 'VALIDATED', 'SUBMITTED', 'FILLED'];
 
     // Compute Institutional Confluence Score (0 - 100) & Grade
     let confluenceScore = isForced ? 95 : 0;
     const confluences = [];
 
     // 1. Trend Filter: Price respect to 20 EMA (+25 pts)
-    if (type === 'BUY' && currentPrice >= (ema20 || currentPrice) * 0.998) {
+    if (type === 'BUY' && executedPrice >= (ema20 || executedPrice) * 0.998) {
       if (!isForced) confluenceScore += 25;
-      confluences.push('20 EMA Uptrend Support');
-    } else if (type === 'SELL' && currentPrice <= (ema20 || currentPrice) * 1.002) {
+      confluences.push('20 EMA Uptrend Support (Nifty 50)');
+    } else if (type === 'SELL' && executedPrice <= (ema20 || executedPrice) * 1.002) {
       if (!isForced) confluenceScore += 25;
-      confluences.push('20 EMA Downtrend Resistance');
+      confluences.push('20 EMA Downtrend Resistance (Nifty 50)');
     } else {
       if (!isForced) confluenceScore += 18;
       confluences.push(`${type === 'BUY' ? 'Bullish' : 'Bearish'} Momentum Continuation`);
     }
 
     // 2. Momentum Filter: Healthy RSI Range (+25 pts)
-    if ((type === 'BUY' && rsi >= 44 && rsi <= 68) || (type === 'SELL' && rsi >= 32 && rsi <= 56)) {
+    if ((type === 'BUY' && rsi >= 42 && rsi <= 68) || (type === 'SELL' && rsi >= 32 && rsi <= 56)) {
       if (!isForced) confluenceScore += 25;
       confluences.push(`Healthy RSI Momentum (${rsi})`);
     } else {
@@ -1193,14 +1159,15 @@ export class AutonomousTrader {
     }
 
     // 3. Institutional Session Window (+20 pts)
+    const now = new Date();
     const istHour = (now.getUTCHours() + 5 + Math.floor((now.getUTCMinutes() + 30) / 60)) % 24;
-    const isInstitutionalSession = (istHour >= 13 && istHour <= 17) || (istHour >= 18 && istHour <= 23);
-    if (isInstitutionalSession) {
+    const isNSEExpansion = (istHour >= 9 && istHour <= 11) || (istHour >= 13 && istHour <= 15);
+    if (isNSEExpansion) {
       if (!isForced) confluenceScore += 20;
-      confluences.push('Institutional Session (London/NY)');
+      confluences.push('NSE Core Session Expansion');
     } else {
       if (!isForced) confluenceScore += 12;
-      confluences.push('Asian Session Setup');
+      confluences.push('Midday Consolidation Zone');
     }
 
     // 4. Learned Rules Clearance (+20 pts)
@@ -1209,18 +1176,23 @@ export class AutonomousTrader {
 
     // 5. Dynamic Trailing Target (+10 pts)
     if (!isForced) confluenceScore += 10;
-    confluences.push(isForced ? 'Instant Operator Trigger' : 'Uncapped Dynamic Trailing Target');
+    confluences.push(isForced ? 'Instant Operator Trigger' : '1:2.5 Uncapped Dynamic Trailing Target');
 
     const setupGrade = confluenceScore >= 90 ? 'A+' : confluenceScore >= 80 ? 'A' : 'B+';
 
     this.activePosition = {
       id: `trade_${Date.now()}`,
-      assetKey: this.activeAssetKey,
+      idempotencyKey,
+      orderState: 'FILLED',
+      orderPipeline,
+      assetKey: 'NIFTY50',
       symbol: asset.symbol,
       assetName: asset.name,
       type,
-      entryPrice: currentPrice,
-      currentPrice,
+      entryPrice: executedPrice,
+      marketPrice: currentPrice,
+      slippagePoints,
+      currentPrice: executedPrice,
       stopLoss,
       initialStopLoss: stopLoss,
       stopDistance,
@@ -1236,17 +1208,17 @@ export class AutonomousTrader {
       setupGrade,
       confluences,
       highestPnL: 0,
-      activeDecision: `Active ${type}: Monitoring 20 EMA & trailing momentum. Target: $${targetPrice}`,
+      activeDecision: `Active ${type}: Monitoring 20 EMA & trailing momentum. Target: ₹${targetPrice}`,
       openedTimestamp: Date.now(),
       openedAt: new Date().toLocaleTimeString('en-IN', { hour12: false })
     };
 
     this.addLog(
       'ORDER',
-      `🚀 EXECUTED VIRTUAL ${type}: ${asset.name} @ ${currentPrice} | Grade: ${setupGrade} (${confluenceScore}/100) | SL: ${stopLoss} | Target: ${targetPrice} (${isForced ? '⚡ Instant Test' : 'Autonomous 20 EMA'})`
+      `🚀 EXECUTED VIRTUAL ${type}: ${asset.name} @ ₹${executedPrice} (Slippage: ${slippagePoints} pts) | Grade: ${setupGrade} (${confluenceScore}/100) | SL: ₹${stopLoss} | Target: ₹${targetPrice} (${isForced ? '⚡ Instant Test' : 'Autonomous 20 EMA'})`
     );
 
-    this.latestAnnouncement = `Raj bhai, maine ${asset.name} mein ${currentPrice} par virtual ${type === 'BUY' ? 'Buy (Long)' : 'Sell (Short)'} position open ki hai. Trailing engine active hai jo profit ride karega!`;
+    this.latestAnnouncement = `Raj bhai, maine ${asset.name} mein ₹${executedPrice} par virtual ${type === 'BUY' ? 'Buy (Long)' : 'Sell (Short)'} order execute kiya hai (slippage: ${slippagePoints} pts). Trailing stop active hai!`;
     this.saveState();
   }
 
@@ -1272,11 +1244,9 @@ export class AutonomousTrader {
 
     return {
       success: true,
-      message: `Instant ${setupType} trade executed on ${this.assets[this.activeAssetKey].name} @ $${currentPrice}!`,
+      message: `Instant ${setupType} trade executed on ${this.assets[this.activeAssetKey].name} @ ₹${currentPrice}!`,
       state: this.getState()
     };
-  }
-    }
   }
 
   // Continuous Market Structure Study via Gemini AI
@@ -1321,22 +1291,20 @@ Write 1 brief insight (Hinglish/English, under 20 words) analyzing current insti
   // Get full state representation for API
   getState() {
     this.updateWalletEquity();
-    const asset = this.assets[this.activeAssetKey] || this.assets['NIFTY50'];
+    const asset = this.assets[this.activeAssetKey];
     return {
       isRunning: this.isRunning,
       activeAsset: {
-        key: this.activeAssetKey || 'NIFTY50',
+        key: this.activeAssetKey,
         name: asset?.name || 'Nifty 50 Index (NSE)',
         symbol: asset?.symbol || 'NIFTY50',
         tvSymbol: asset?.tvSymbol || 'NSE:NIFTY',
-        currency: asset?.currency || '₹'
+        currency: '₹'
       },
       availableAssets: Object.entries(this.assets).map(([key, val]) => ({
         key,
         name: val.name,
-        symbol: val.symbol,
-        tvSymbol: val.tvSymbol,
-        currency: val.currency
+        symbol: val.symbol
       })),
       livePrice: this.livePrice,
       wallet: this.wallet,

@@ -113,12 +113,12 @@ export default function App() {
     return [
       {
         id: 'default',
-        title: 'Gold Sniper Setup',
+        title: 'Nifty 50 Quant Model',
         messages: [
           {
             role: 'assistant',
             content:
-              '**Namaste Raj bhai! Main hoon tera personal VibeTrader AI.** 🚀\n\nAbhi tu TradingView par paper trading kar raha hai. Jab bhi tujhe chart samajh na aaye, tu:\n1. **Screenshot paste kar** (`Ctrl + V` ya attachment icon se)\n2. **Mic daba kar bol**\n3. Ya **"Screen Watch"** chalu kar jisse main teri TradingView screen live dekh kar audio advice de sakoon!\n\nBata, aaj kya plan hai?',
+              '**Namaste Raj bhai! Main hoon tera personal VibeTrader AI.** 🚀\n\nAbhi ham exclusively **🇮🇳 Nifty 50 Index (NSE)** par 5-minute quant paper trading aur institutional learning kar rahe hain. Jab bhi tujhe chart samajh na aaye, tu:\n1. **Screenshot paste kar** (`Ctrl + V` ya attachment icon se)\n2. **Mic daba kar bol**\n3. Ya **"Screen Watch"** chalu kar jisse main teri TradingView screen live dekh kar audio advice de sakoon!\n\nBata, aaj Nifty 50 par kya plan hai?',
             audio: null
           }
         ]
@@ -551,7 +551,7 @@ export default function App() {
 
   const activeChat = chats.find((c) => c.id === currentChatId) || chats[0] || {
     id: 'default',
-    title: 'Gold Sniper Setup',
+    title: 'Nifty 50 Quant Model',
     messages: []
   };
 
@@ -1244,7 +1244,7 @@ export default function App() {
                     <span className={`w-2 h-2 rounded-full ${botState?.isRunning ? 'bg-emerald-400 animate-ping' : 'bg-zinc-600'}`}></span>
                   </div>
                   <div className="text-[10px] text-zinc-400">
-                    {botState?.isRunning ? `Trading ${botState.activeAsset?.name || 'Gold'}` : 'Autopilot Paper Bot'}
+                    {botState?.isRunning ? `Trading ${botState.activeAsset?.name || 'Nifty 50'}` : 'Autopilot Paper Bot'}
                   </div>
                 </div>
               </div>
@@ -1298,7 +1298,7 @@ export default function App() {
               <button
                 onClick={() => {
                   setTradingMode('hedge_fund');
-                  handleSendMessage('Hedge Fund Committee Mode activate karo aur Gold ka Technical + Bull vs Bear debate karke analysis do.');
+                  handleSendMessage('Hedge Fund Committee Mode activate karo aur Nifty 50 ka Technical + Bull vs Bear debate karke analysis do.');
                 }}
                 className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs flex items-center gap-2 transition ${
                   tradingMode === 'hedge_fund' ? 'bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 font-semibold' : 'text-zinc-300 hover:bg-zinc-800'
@@ -1310,7 +1310,7 @@ export default function App() {
               <button
                 onClick={() => {
                   setTradingMode('sniper_scalp');
-                  handleSendMessage('Gold (XAUUSD) 5m chart ke liye immediate sniper pullback entry aur stop loss do.');
+                  handleSendMessage('Nifty 50 5m chart ke liye immediate sniper pullback entry aur stop loss do.');
                 }}
                 className={`w-full text-left px-2.5 py-1.5 rounded-md text-xs flex items-center gap-2 transition ${
                   tradingMode === 'sniper_scalp' ? 'bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 font-semibold' : 'text-zinc-300 hover:bg-zinc-800'
@@ -1819,14 +1819,14 @@ export default function App() {
 
                 <button
                   onClick={() =>
-                    handleSendMessage('Gold (XAUUSD) 5-minute chart par trade lene ke 3 golden rules batao.')
+                    handleSendMessage('Nifty 50 5-minute chart par trade lene ke 3 golden rules batao.')
                   }
                   className="p-3.5 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800/80 transition group"
                 >
                   <div className="flex items-center gap-2 text-xs font-semibold text-amber-400 mb-1">
-                    <Coins className="w-3.5 h-3.5" /> Gold (XAUUSD) Rules
+                    <Coins className="w-3.5 h-3.5" /> Nifty 50 (NSE) Rules
                   </div>
-                  <div className="text-xs text-zinc-300">Gold scalping ke liye entry aur stop loss ke golden rules.</div>
+                  <div className="text-xs text-zinc-300">Nifty 50 intraday scalping ke liye entry aur stop loss rules.</div>
                 </button>
 
                 <button
@@ -2564,14 +2564,11 @@ export default function App() {
                   )}
                 </button>
 
-                {/* Dedicated Focus Asset: 🇮🇳 Nifty 50 Index (NSE) */}
-                <select
-                  value="NIFTY50"
-                  disabled
-                  className="bg-zinc-800/90 border border-emerald-500/50 text-emerald-300 text-xs rounded-lg px-2.5 py-1.5 font-bold focus:outline-none cursor-default shadow-sm"
-                >
-                  <option value="NIFTY50">🇮🇳 Nifty 50 Index (NSE) [Exclusive AI Trader]</option>
-                </select>
+                {/* Dedicated Sole Market: Indian Benchmark Nifty 50 Index (NSE) */}
+                <div className="flex items-center gap-1.5 bg-zinc-800/90 border border-emerald-500/50 text-emerald-300 text-xs rounded-lg px-2.5 py-1.5 font-bold shadow-sm">
+                  <span>🇮🇳 Nifty 50 (NSE)</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                </div>
 
                 {/* Start / Pause Autopilot Button */}
                 {!botState?.isRunning ? (
@@ -2669,19 +2666,19 @@ export default function App() {
               {/* Live Ticker Price */}
               <div className="p-2.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex flex-col justify-between col-span-2 sm:col-span-1">
                 <div className="flex items-center justify-between text-[10.5px] text-emerald-400 font-medium">
-                  <span>Live Market Price</span>
+                  <span>NSE Live Price</span>
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
                 </div>
                 <span className="text-base font-mono font-bold text-emerald-300">
-                  {botState?.activeAsset?.currency || '$'}{botState?.livePrice || 4096.50}
+                  ₹{botState?.livePrice ? botState.livePrice.toLocaleString('en-IN') : '25,800.60'}
                 </span>
                 <span className="text-[10px] text-zinc-400 truncate">
-                  {botState?.activeAsset?.name || 'Gold'}
+                  {botState?.activeAsset?.name || 'Nifty 50 Index (NSE)'}
                 </span>
               </div>
             </div>
 
-            {/* Daily ₹4,000–₹5,000 Target Progress & Multi-Market Radar Strip */}
+            {/* Daily ₹4,000–₹5,000 Target Progress & Nifty 50 Quant Strip */}
             <div className="px-3.5 py-2 bg-zinc-900/60 border-b border-zinc-800 flex flex-col md:flex-row items-center justify-between gap-2.5 shrink-0">
               {/* Daily Target Progress Meter */}
               <div className="flex items-center gap-3 w-full md:w-auto">
@@ -2711,15 +2708,17 @@ export default function App() {
                 )}
               </div>
 
-              {/* Multi-Market Radar Strip (Click to Switch Asset) */}
-              <div className="flex items-center gap-1.5 overflow-x-auto max-w-full text-[11px] font-mono">
-                <span className="text-[10px] text-zinc-500 font-sans uppercase font-bold mr-1">Active Market:</span>
-                <div className="px-2.5 py-0.5 rounded-lg border border-emerald-500 bg-emerald-950/70 text-[10.5px] font-bold text-emerald-300 flex items-center gap-1.5 shadow-sm">
-                  <span>🇮🇳 Nifty 50 Index (NSE)</span>
+              {/* Dedicated Nifty 50 Quant Radar Strip */}
+              <div className="flex items-center gap-2 overflow-x-auto max-w-full text-[11px] font-mono">
+                <span className="text-[10px] text-zinc-500 font-sans uppercase font-bold mr-0.5">Asset:</span>
+                <div className="px-2.5 py-1 rounded-lg border border-emerald-500/50 bg-emerald-950/60 text-emerald-300 font-bold text-[11px] flex items-center gap-2 shadow-sm">
+                  <span>🇮🇳 NIFTY 50 (NSE)</span>
                   <span className="text-zinc-500">•</span>
-                  <span className="text-emerald-400">
-                    ₹{botState?.livePrice || 25800.60}
-                  </span>
+                  <span className="text-emerald-400 font-mono">₹{botState?.livePrice ? botState.livePrice.toLocaleString('en-IN') : '25,800.60'}</span>
+                  <span className="text-zinc-500">•</span>
+                  <span className="text-cyan-300 font-normal">5m 20-EMA Model</span>
+                  <span className="text-zinc-500">•</span>
+                  <span className="text-amber-300/80 font-normal">09:15-15:30 IST</span>
                 </div>
               </div>
             </div>
@@ -2772,17 +2771,17 @@ export default function App() {
                 {/* Left Side: Real-time Embedded TradingView Chart (7 Cols) */}
                 <div className="lg:col-span-7 h-full flex flex-col border-b lg:border-b-0 lg:border-r border-zinc-800 relative bg-black">
                   <iframe
-                    key={botState?.activeAsset?.tvSymbol || botState?.activeAsset?.symbol || 'PAXGUSDT'}
-                    src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_bot&symbol=${encodeURIComponent(botState?.activeAsset?.tvSymbol || 'BINANCE:PAXGUSDT')}&interval=5&hidesidetoolbar=0&symboledit=1&saveimage=0&toolbarbg=111113&theme=dark&style=1&timezone=Asia%2FKolkata&locale=en`}
+                    key="NSE_NIFTY_CHART"
+                    src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_bot&symbol=NSE%3ANIFTY&interval=5&hidesidetoolbar=0&symboledit=1&saveimage=0&toolbarbg=111113&theme=dark&style=1&timezone=Asia%2FKolkata&locale=en"
                     className="w-full flex-1 border-0"
-                    title="Live TradingView Autonomous Browser View"
+                    title="Live TradingView Autonomous Browser View - NSE Nifty 50"
                   />
                   {/* Floating Chart Watermark */}
                   <div className="absolute top-3 right-3 bg-zinc-950/80 border border-emerald-500/40 px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold pointer-events-none flex items-center gap-1.5 backdrop-blur-md">
                     {botState?.isRunning ? (
                       <>
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        <span className="text-emerald-400">24/7 AI Scanner Live</span>
+                        <span className="text-emerald-400">24/7 Nifty 50 AI Scanner Live</span>
                       </>
                     ) : (
                       <>
@@ -2949,7 +2948,7 @@ export default function App() {
                               <span>24/7 Market Radar Active — Hunting A+ Setup</span>
                             </div>
                             <div className="text-[11px] text-emerald-300 font-mono bg-zinc-900/90 px-3 py-1.5 rounded-lg border border-zinc-800 my-1.5 max-w-md truncate">
-                              {botState?.scannerStatus || `Scanning ${botState?.activeAsset?.name || 'Gold'} • 20 EMA & RSI Momentum Setup`}
+                              {botState?.scannerStatus || `Scanning ${botState?.activeAsset?.name || 'Nifty 50'} • 20 EMA & RSI Momentum Setup`}
                             </div>
                             <div className="text-[10px] text-zinc-400 max-w-sm mt-1 flex items-center justify-center gap-2">
                               <span>Target: ₹4k–₹12k+ • Today: {botState?.dailyStats?.tradesCount || 0} trades</span>
@@ -3161,10 +3160,10 @@ export default function App() {
                   <div className="flex flex-wrap gap-1.5 items-center">
                     <span className="text-[10px] text-zinc-500 font-semibold mr-1">Quick Coach:</span>
                     {[
-                      "US CPI News (8:30 PM) ke time high volatility mein trade mat lena",
+                      "NSE Opening (9:15 - 9:30 AM) ke initial wick traps se bacho, structure set hone do",
                       "RSI 70 ke upar Buy mat lena, rejection candle ka wait karna",
-                      "Jab bhi target 1:2 hit ho jaye to greedy mat banna, profit book karna",
-                      "Gold mein 20 EMA ke counter-trend trade bina multi-timeframe confirmation ke mat lena"
+                      "Jab bhi target 1:2 hit ho jaye to greedy mat banna, profit lock karna",
+                      "Nifty 50 mein 20 EMA ke counter-trend trade bina 5m confirmation ke mat lena"
                     ].map((chip, idx) => (
                       <button
                         key={idx}

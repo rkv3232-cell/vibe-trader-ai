@@ -44,9 +44,9 @@ const DEFAULT_RULES = [
   },
   {
     id: 'rule_raj_prime_windows',
-    rule: 'Prime Institutional Liquidity Windows: Focus Gold & Crypto execution during London (1:30 PM - 5:30 PM IST) and New York (6:30 PM - 11:30 PM IST) session expansions.',
+    rule: 'Prime Institutional Liquidity Windows: Focus Nifty 50 Index execution during NSE opening expansion (9:15 AM - 11:30 AM IST) and European overlap (1:00 PM - 3:30 PM IST). Avoid trading in lunch lull.',
     source: 'TRAINED_BY_RAJ',
-    context: 'Trained by Raj: "Institutional volume time par hi clean ₹4,000–₹5,000 trend moves milte hain."',
+    context: 'Trained by Raj: "NSE institutional volume time par hi clean ₹4,000–₹5,000 trend moves milte hain."',
     enforcedCount: 0,
     active: true,
     createdAt: new Date().toISOString()
