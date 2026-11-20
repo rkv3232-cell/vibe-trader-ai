@@ -2564,16 +2564,19 @@ export default function App() {
                   )}
                 </button>
 
-                {/* Asset Dropdown */}
+                {/* Asset Dropdown (Crypto, Commodities, Indian Stock Market NSE & US NASDAQ) */}
                 <select
                   value={botState?.activeAsset?.key || 'XAUUSD'}
                   onChange={(e) => handleSetBotAsset(e.target.value)}
                   className="bg-zinc-800/90 border border-zinc-700 text-zinc-200 text-xs rounded-lg px-2.5 py-1.5 font-semibold focus:outline-none cursor-pointer hover:border-emerald-500/50 transition"
                 >
-                  <option value="XAUUSD">🥇 Gold (PAXG/USD)</option>
-                  <option value="BTCUSDT">₿ Bitcoin (BTC/USD)</option>
-                  <option value="ETHUSDT">Ξ Ethereum (ETH/USD)</option>
-                  <option value="SOLUSDT">◎ Solana (SOL/USD)</option>
+                  <option value="XAUUSD">🥇 Gold (PAXG/USD) [24/7]</option>
+                  <option value="BTCUSDT">₿ Bitcoin (BTC/USD) [24/7]</option>
+                  <option value="ETHUSDT">Ξ Ethereum (ETH/USD) [24/7]</option>
+                  <option value="SOLUSDT">◎ Solana (SOL/USD) [24/7]</option>
+                  <option value="NIFTY50">🇮🇳 Nifty 50 Index (NSE)</option>
+                  <option value="RELIANCE">🇮🇳 Reliance Ind (NSE)</option>
+                  <option value="TSLA">🇺🇸 Tesla Inc (NASDAQ)</option>
                 </select>
 
                 {/* Start / Pause Autopilot Button */}
@@ -2676,7 +2679,7 @@ export default function App() {
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
                 </div>
                 <span className="text-base font-mono font-bold text-emerald-300">
-                  ${botState?.livePrice || 4096.50}
+                  {botState?.activeAsset?.currency || '$'}{botState?.livePrice || 4096.50}
                 </span>
                 <span className="text-[10px] text-zinc-400 truncate">
                   {botState?.activeAsset?.name || 'Gold'}
@@ -2735,7 +2738,7 @@ export default function App() {
                     <span>{m.name}</span>
                     <span className="text-zinc-500">•</span>
                     <span className={botState?.activeAsset?.key === m.key ? 'text-emerald-400' : 'text-zinc-300'}>
-                      ${m.price}
+                      {m.currency || '$'}{m.price}
                     </span>
                   </button>
                 ))}
@@ -2790,8 +2793,8 @@ export default function App() {
                 {/* Left Side: Real-time Embedded TradingView Chart (7 Cols) */}
                 <div className="lg:col-span-7 h-full flex flex-col border-b lg:border-b-0 lg:border-r border-zinc-800 relative bg-black">
                   <iframe
-                    key={botState?.activeAsset?.symbol || 'PAXGUSDT'}
-                    src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_bot&symbol=BINANCE%3A${botState?.activeAsset?.symbol || 'PAXGUSDT'}&interval=5&hidesidetoolbar=0&symboledit=1&saveimage=0&toolbarbg=111113&theme=dark&style=1&timezone=Asia%2FKolkata&locale=en`}
+                    key={botState?.activeAsset?.tvSymbol || botState?.activeAsset?.symbol || 'PAXGUSDT'}
+                    src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_bot&symbol=${encodeURIComponent(botState?.activeAsset?.tvSymbol || 'BINANCE:PAXGUSDT')}&interval=5&hidesidetoolbar=0&symboledit=1&saveimage=0&toolbarbg=111113&theme=dark&style=1&timezone=Asia%2FKolkata&locale=en`}
                     className="w-full flex-1 border-0"
                     title="Live TradingView Autonomous Browser View"
                   />

@@ -25,39 +25,84 @@ export class AutonomousTrader {
     this.intervalId = null;
     this.cycleSeconds = 6; // Evaluates live market every 6 seconds
 
-    // Supported live assets with multi-exchange institutional fallback
+    // Supported live assets: 24/7 Commodities, Crypto, and Global Stock Markets (NSE / NASDAQ)
     this.assets = {
       XAUUSD: {
         name: 'Gold (PAXG/USD)',
         symbol: 'PAXGUSDT',
+        tvSymbol: 'BINANCE:PAXGUSDT',
         coinbasePair: 'PAXG-USD',
         krakenPair: 'PAXGUSD',
         decimals: 2,
-        minMove: 0.1
+        minMove: 0.1,
+        type: 'COMMODITY',
+        currency: '$'
       },
       BTCUSDT: {
         name: 'Bitcoin (BTC/USD)',
         symbol: 'BTCUSDT',
+        tvSymbol: 'BINANCE:BTCUSDT',
         coinbasePair: 'BTC-USD',
         krakenPair: 'XBTUSD',
         decimals: 2,
-        minMove: 1.0
+        minMove: 1.0,
+        type: 'CRYPTO',
+        currency: '$'
       },
       ETHUSDT: {
         name: 'Ethereum (ETH/USD)',
         symbol: 'ETHUSDT',
+        tvSymbol: 'BINANCE:ETHUSDT',
         coinbasePair: 'ETH-USD',
         krakenPair: 'ETHUSD',
         decimals: 2,
-        minMove: 0.5
+        minMove: 0.5,
+        type: 'CRYPTO',
+        currency: '$'
       },
       SOLUSDT: {
         name: 'Solana (SOL/USD)',
         symbol: 'SOLUSDT',
+        tvSymbol: 'BINANCE:SOLUSDT',
         coinbasePair: 'SOL-USD',
         krakenPair: 'SOLUSD',
         decimals: 2,
-        minMove: 0.05
+        minMove: 0.05,
+        type: 'CRYPTO',
+        currency: '$'
+      },
+      NIFTY50: {
+        name: 'Nifty 50 Index (NSE)',
+        symbol: 'NIFTY50',
+        tvSymbol: 'NSE:NIFTY',
+        yahooTicker: '^NSEI',
+        decimals: 2,
+        minMove: 0.5,
+        type: 'STOCK_INDEX',
+        currency: '₹',
+        marketHours: '09:15-15:30'
+      },
+      RELIANCE: {
+        name: 'Reliance Industries (NSE)',
+        symbol: 'RELIANCE',
+        tvSymbol: 'BSE:RELIANCE',
+        yahooTicker: 'RELIANCE.NS',
+        decimals: 2,
+        minMove: 0.25,
+        type: 'STOCK',
+        currency: '₹',
+        marketHours: '09:15-15:30'
+      },
+      TSLA: {
+        name: 'Tesla Inc (NASDAQ)',
+        symbol: 'TSLA',
+        tvSymbol: 'NASDAQ:TSLA',
+        yahooTicker: 'TSLA',
+        decimals: 2,
+        minMove: 0.1,
+        type: 'STOCK',
+        currency: '$',
+        marketHours: '19:00-01:30'
       }
     };
 
@@ -288,10 +333,30 @@ export class AutonomousTrader {
     }
   }
 
-  // Fetch real live price for a specific asset (Binance Vision -> Coinbase -> Kraken)
+  // Fetch real live price for a specific asset (Yahoo Finance for Stocks, Binance Vision -> Coinbase -> Kraken for Crypto/Gold)
   async fetchPriceForAsset(assetKey) {
     const asset = this.assets[assetKey] || this.assets[this.activeAssetKey];
     if (!asset) return this.livePrice;
+
+    // 0. Try Yahoo Finance for Indian Stocks (Nifty, Reliance) and US Stocks (Tesla)
+    if (asset.yahooTicker) {
+      try {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(asset.yahooTicker)}?interval=5m&range=1d`;
+        const res = await fetch(url, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+          signal: AbortSignal.timeout(3500)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+          if (typeof price === 'number' && !isNaN(price) && price > 0) {
+            return Number(price.toFixed(asset.decimals));
+          }
+        }
+      } catch (e) {
+        // Fall through to fallback
+      }
+    }
 
     // 1. Try Binance Vision Global Public Data API (Matches TradingView Binance chart 100% & zero IP blocks)
     try {
@@ -354,9 +419,33 @@ export class AutonomousTrader {
     return price;
   }
 
-  // Multi-Market Institutional Radar: Polls live spot prices across all 4 markets
+  // Multi-Market Institutional Radar: Polls live spot prices across all markets
   async updateMarketRadar() {
     for (const [key, asset] of Object.entries(this.assets)) {
+      // 0. Try Yahoo Finance for Stock Markets (Nifty, Reliance, Tesla)
+      if (asset.yahooTicker) {
+        try {
+          const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(asset.yahooTicker)}?interval=5m&range=1d`;
+          const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(2500) });
+          if (res.ok) {
+            const data = await res.json();
+            const p = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+            if (typeof p === 'number' && !isNaN(p) && p > 0) {
+              this.marketRadar[key] = {
+                key,
+                name: asset.name.split(' ')[0],
+                symbol: asset.symbol,
+                price: Number(p.toFixed(asset.decimals)),
+                currency: asset.currency || '₹'
+              };
+              continue;
+            }
+          }
+        } catch (e) {
+          // Fall through
+        }
+      }
+
       // 1. Try Binance Vision
       try {
         const url = `https://data-api.binance.vision/api/v3/ticker/price?symbol=${asset.symbol}`;
@@ -408,6 +497,54 @@ export class AutonomousTrader {
     if (!asset) {
       const fallbackEma = this.calculateEMA(20);
       return { price: this.livePrice, ema9: fallbackEma, ema20: fallbackEma, rsi: 50, trend: 'BULLISH' };
+    }
+
+    // 0. Stock Market 5m Candle Analysis via Yahoo Finance
+    if (asset.yahooTicker) {
+      try {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(asset.yahooTicker)}?interval=5m&range=1d`;
+        const res = await fetch(url, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+          signal: AbortSignal.timeout(3500)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const closes = data?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(x => typeof x === 'number' && !isNaN(x)) || [];
+          if (closes.length >= 10) {
+            const currentClose = closes[closes.length - 1];
+            let ema9 = closes[0];
+            const k9 = 2 / (9 + 1);
+            for (let i = 1; i < closes.length; i++) ema9 = closes[i] * k9 + ema9 * (1 - k9);
+
+            let ema20 = closes[0];
+            const k20 = 2 / (20 + 1);
+            for (let i = 1; i < closes.length; i++) ema20 = closes[i] * k20 + ema20 * (1 - k20);
+
+            let gains = 0, losses = 0;
+            const p = Math.min(14, closes.length - 1);
+            for (let i = closes.length - p; i < closes.length; i++) {
+              const diff = closes[i] - closes[i - 1];
+              if (diff >= 0) gains += diff; else losses += Math.abs(diff);
+            }
+            let rsi = 50.0;
+            if (losses === 0) rsi = 100.0;
+            else {
+              const rs = (gains / p) / (losses / p);
+              rsi = Number((100 - (100 / (1 + rs))).toFixed(1));
+            }
+            const trend = ema9 >= ema20 ? 'BULLISH' : 'BEARISH';
+            return {
+              price: currentClose,
+              ema9: Number(ema9.toFixed(asset.decimals)),
+              ema20: Number(ema20.toFixed(asset.decimals)),
+              rsi,
+              trend
+            };
+          }
+        }
+      } catch (e) {
+        // Fall through
+      }
     }
 
     try {
@@ -891,9 +1028,40 @@ export class AutonomousTrader {
     }
   }
 
+  // Check if market for an asset is currently in active trading session
+  isMarketInSession(assetKey) {
+    const asset = this.assets[assetKey || this.activeAssetKey];
+    if (!asset || !asset.marketHours) return true; // 24/7 for Crypto and Gold
+
+    const now = new Date();
+    const istString = now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
+    const istDate = new Date(istString);
+    const day = istDate.getDay(); // 0 = Sun, 6 = Sat
+    if (day === 0 || day === 6) return false;
+
+    const hours = istDate.getHours();
+    const minutes = istDate.getMinutes();
+    const totalMinutes = hours * 60 + minutes;
+
+    if (asset.marketHours === '09:15-15:30') {
+      // Indian Stock Market (NSE/BSE): 9:15 AM to 3:30 PM IST
+      return totalMinutes >= 555 && totalMinutes <= 930;
+    } else if (asset.marketHours === '19:00-01:30') {
+      // US Stock Market (NASDAQ): 7:00 PM to 1:30 AM IST
+      return totalMinutes >= 1140 || totalMinutes <= 90;
+    }
+    return true;
+  }
+
   // Scan Market & Look for Symmetrical Institutional Setups (Equal 50/50 BUY & SELL)
   async scanAndEvaluateMarket(currentPrice) {
     const asset = this.assets[this.activeAssetKey];
+
+    // Market session check for stock assets
+    if (!this.isMarketInSession(this.activeAssetKey)) {
+      this.scannerStatus = `🟡 ${asset.name} Closed (${asset.marketHours === '09:15-15:30' ? 'NSE Opens 9:15 AM - 3:30 PM IST Mon-Fri' : 'US Market Opens 7:00 PM - 1:30 AM IST'}) • 24/7 Active on Gold & Crypto`;
+      return;
+    }
 
     // 1. Daily Circuit Breaker Check (Strict Risk Shield: 2 losses = halt for the day)
     if (this.dailyStats.lossCount >= 2) {
@@ -1041,6 +1209,12 @@ export class AutonomousTrader {
       stopPct = 0.0035;
     } else if (this.activeAssetKey === 'ETHUSDT') {
       stopPct = 0.0025;
+    } else if (this.activeAssetKey === 'NIFTY50') {
+      stopPct = 0.0015; // ~35-40 pts on Nifty
+    } else if (this.activeAssetKey === 'RELIANCE') {
+      stopPct = 0.0030; // ~4-5 Rs on Reliance
+    } else if (this.activeAssetKey === 'TSLA') {
+      stopPct = 0.0050; // ~1.5-2 USD on Tesla
     }
 
     const stopDistance = Math.max(
