@@ -514,6 +514,77 @@ app.post('/api/bot/force-trade', async (req, res) => {
   res.json(result);
 });
 
+// GET Real 5-Minute Nifty 50 Candlestick Data & EMA overlays (Yahoo Finance ^NSEI)
+app.get('/api/nifty/candles', async (req, res) => {
+  try {
+    const url = 'https://query1.finance.yahoo.com/v8/finance/chart/%5ENSEI?interval=5m&range=1d';
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+      signal: AbortSignal.timeout(4000)
+    });
+    if (!response.ok) {
+      throw new Error(`Yahoo Finance responded with status ${response.status}`);
+    }
+    const data = await response.json();
+    const result = data?.chart?.result?.[0];
+    const timestamps = result?.timestamp || [];
+    const quote = result?.indicators?.quote?.[0] || {};
+
+    const candles = [];
+    for (let i = 0; i < timestamps.length; i++) {
+      const open = quote.open?.[i];
+      const high = quote.high?.[i];
+      const low = quote.low?.[i];
+      const close = quote.close?.[i];
+      const time = timestamps[i];
+      if (typeof open === 'number' && typeof high === 'number' && typeof low === 'number' && typeof close === 'number' && !isNaN(close)) {
+        candles.push({
+          time,
+          open: Number(open.toFixed(2)),
+          high: Number(high.toFixed(2)),
+          low: Number(low.toFixed(2)),
+          close: Number(close.toFixed(2))
+        });
+      }
+    }
+
+    // Compute 9 EMA & 20 EMA overlay points
+    const ema9 = [];
+    const ema20 = [];
+    if (candles.length > 0) {
+      const k9 = 2 / (9 + 1);
+      let currEma9 = candles[0].close;
+      ema9.push({ time: candles[0].time, value: currEma9 });
+
+      for (let i = 1; i < candles.length; i++) {
+        currEma9 = Number((candles[i].close * k9 + currEma9 * (1 - k9)).toFixed(2));
+        ema9.push({ time: candles[i].time, value: currEma9 });
+      }
+
+      const k20 = 2 / (20 + 1);
+      let currEma20 = candles[0].close;
+      ema20.push({ time: candles[0].time, value: currEma20 });
+
+      for (let i = 1; i < candles.length; i++) {
+        currEma20 = Number((candles[i].close * k20 + currEma20 * (1 - k20)).toFixed(2));
+        ema20.push({ time: candles[i].time, value: currEma20 });
+      }
+    }
+
+    res.json({
+      symbol: 'NSE:NIFTY',
+      name: 'Nifty 50 Index (NSE)',
+      candles,
+      ema9,
+      ema20,
+      currentPrice: candles.length > 0 ? candles[candles.length - 1].close : 25800.60
+    });
+  } catch (err) {
+    console.warn('Nifty candles error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ==========================================
 // AI EXPERIENCE & TRAINING BRAIN ENDPOINTS
 // ==========================================

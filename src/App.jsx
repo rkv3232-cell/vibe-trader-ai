@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createChart, CandlestickSeries, LineSeries } from 'lightweight-charts';
 import {
   MessageSquare,
   Plus,
@@ -90,59 +91,229 @@ const compressImage = (base64Str, maxWidth = 1920, quality = 0.88) => {
   });
 };
 
-// Dedicated Official TradingView Advanced Interactive Chart Component for Nifty 50 (NSE)
-const TradingViewNiftyChart = React.memo(() => {
-  const containerRef = useRef(null);
+// Real-Time Nifty 50 Candlestick Chart (Powered by TradingView Lightweight Charts Engine)
+const NiftyLightweightChart = React.memo(({ livePrice = 25800.60, isRunning = true }) => {
+  const chartContainerRef = useRef(null);
+  const chartRef = useRef(null);
+  const candleSeriesRef = useRef(null);
+  const ema20SeriesRef = useRef(null);
+  const ema9SeriesRef = useRef(null);
+  const [legend, setLegend] = useState({
+    open: livePrice,
+    high: livePrice,
+    low: livePrice,
+    close: livePrice,
+    change: 0,
+    changePct: 0,
+    ema9: livePrice,
+    ema20: livePrice,
+    isHovered: false
+  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    if (!chartContainerRef.current) return;
 
-    container.innerHTML = '';
-
-    const widgetDiv = document.createElement('div');
-    widgetDiv.className = 'tradingview-widget-container__widget';
-    widgetDiv.style.height = '100%';
-    widgetDiv.style.width = '100%';
-    container.appendChild(widgetDiv);
-
-    const script = document.createElement('script');
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-    script.type = 'text/javascript';
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-      autosize: true,
-      symbol: 'NSE:NIFTY',
-      interval: '5',
-      timezone: 'Asia/Kolkata',
-      theme: 'dark',
-      style: '1',
-      locale: 'in',
-      enable_publishing: false,
-      allow_symbol_change: true,
-      hide_top_toolbar: false,
-      hide_legend: false,
-      save_image: false,
-      calendar: false,
-      hide_volume: false,
-      support_host: 'https://www.tradingview.com'
+    // Create TradingView Lightweight Chart instance
+    const chart = createChart(chartContainerRef.current, {
+      width: chartContainerRef.current.clientWidth,
+      height: chartContainerRef.current.clientHeight || 480,
+      layout: {
+        background: { color: '#09090b' },
+        textColor: '#a1a1aa',
+        fontFamily: 'monospace'
+      },
+      grid: {
+        vertLines: { color: '#18181b' },
+        horzLines: { color: '#18181b' }
+      },
+      crosshair: {
+        mode: 1,
+        vertLine: { color: '#52525b', width: 1, style: 2 },
+        horzLine: { color: '#52525b', width: 1, style: 2 }
+      },
+      rightPriceScale: {
+        borderColor: '#27272a',
+        autoScale: true,
+        scaleMargins: { top: 0.1, bottom: 0.1 }
+      },
+      timeScale: {
+        borderColor: '#27272a',
+        timeVisible: true,
+        secondsVisible: false,
+        fixLeftEdge: true
+      }
     });
 
-    container.appendChild(script);
+    const candleSeries = chart.addSeries(CandlestickSeries, {
+      upColor: '#10b981',
+      downColor: '#ef4444',
+      borderUpColor: '#10b981',
+      borderDownColor: '#ef4444',
+      wickUpColor: '#10b981',
+      wickDownColor: '#ef4444'
+    });
+
+    const ema20Series = chart.addSeries(LineSeries, {
+      color: '#06b6d4',
+      lineWidth: 2,
+      title: '20 EMA'
+    });
+
+    const ema9Series = chart.addSeries(LineSeries, {
+      color: '#f59e0b',
+      lineWidth: 1.5,
+      title: '9 EMA'
+    });
+
+    chartRef.current = chart;
+    candleSeriesRef.current = candleSeries;
+    ema20SeriesRef.current = ema20Series;
+    ema9SeriesRef.current = ema9Series;
+
+    // Crosshair hover legend update
+    chart.subscribeCrosshairMove((param) => {
+      if (!param || !param.time || !param.seriesData) {
+        return;
+      }
+      const cData = param.seriesData.get(candleSeries);
+      const e9Data = param.seriesData.get(ema9Series);
+      const e20Data = param.seriesData.get(ema20Series);
+      if (cData) {
+        const change = Number((cData.close - cData.open).toFixed(2));
+        const changePct = Number(((change / cData.open) * 100).toFixed(2));
+        setLegend({
+          open: cData.open,
+          high: cData.high,
+          low: cData.low,
+          close: cData.close,
+          change,
+          changePct,
+          ema9: e9Data?.value || cData.close,
+          ema20: e20Data?.value || cData.close,
+          isHovered: true
+        });
+      }
+    });
+
+    // Resize observer
+    const handleResize = () => {
+      if (chartContainerRef.current && chart) {
+        chart.applyOptions({
+          width: chartContainerRef.current.clientWidth,
+          height: chartContainerRef.current.clientHeight
+        });
+      }
+    };
+    const ro = new ResizeObserver(handleResize);
+    ro.observe(chartContainerRef.current);
+
+    // Fetch live 5m candles from backend
+    const fetchCandles = async () => {
+      try {
+        const res = await fetch('/api/nifty/candles');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.candles) && data.candles.length > 0) {
+            candleSeries.setData(data.candles);
+            if (Array.isArray(data.ema20) && data.ema20.length > 0) {
+              ema20Series.setData(data.ema20);
+            }
+            if (Array.isArray(data.ema9) && data.ema9.length > 0) {
+              ema9Series.setData(data.ema9);
+            }
+            chart.timeScale().fitContent();
+
+            const last = data.candles[data.candles.length - 1];
+            const lastE9 = data.ema9?.[data.ema9.length - 1]?.value || last.close;
+            const lastE20 = data.ema20?.[data.ema20.length - 1]?.value || last.close;
+            const change = Number((last.close - last.open).toFixed(2));
+            const changePct = Number(((change / last.open) * 100).toFixed(2));
+            setLegend((prev) => prev.isHovered ? prev : {
+              open: last.open,
+              high: last.high,
+              low: last.low,
+              close: last.close,
+              change,
+              changePct,
+              ema9: lastE9,
+              ema20: lastE20,
+              isHovered: false
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Candle fetch error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCandles();
+    const pollId = setInterval(fetchCandles, 8000);
 
     return () => {
-      if (container) {
-        container.innerHTML = '';
-      }
+      clearInterval(pollId);
+      ro.disconnect();
+      chart.remove();
+      chartRef.current = null;
     };
   }, []);
 
   return (
-    <div
-      className="tradingview-widget-container w-full h-full relative"
-      ref={containerRef}
-      style={{ height: '100%', width: '100%' }}
-    />
+    <div className="w-full h-full relative flex flex-col bg-[#09090b] overflow-hidden select-none">
+      {/* Dynamic OHLC & Indicator Top HUD Bar */}
+      <div className="flex flex-wrap items-center justify-between px-3 py-1.5 bg-zinc-950/95 border-b border-zinc-800 text-[11px] font-mono shrink-0 gap-2 z-10">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 font-bold text-zinc-100">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>🇮🇳 NIFTY 50</span>
+          </div>
+          <span className="px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400 text-[10px]">5m</span>
+          <span className="text-zinc-500">|</span>
+          <div className="flex items-center gap-2 text-zinc-400 text-[10.5px]">
+            <span>O: <strong className="text-zinc-200">₹{legend.open?.toLocaleString('en-IN')}</strong></span>
+            <span>H: <strong className="text-zinc-200">₹{legend.high?.toLocaleString('en-IN')}</strong></span>
+            <span>L: <strong className="text-zinc-200">₹{legend.low?.toLocaleString('en-IN')}</strong></span>
+            <span>C: <strong className={legend.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}>₹{legend.close?.toLocaleString('en-IN')}</strong></span>
+            <span className={legend.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+              ({legend.change >= 0 ? `+${legend.change}` : legend.change} | {legend.changePct}%)
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <span className="px-1.5 py-0.2 rounded bg-amber-950/60 border border-amber-500/40 text-amber-300 text-[10px] font-bold">
+            9 EMA: ₹{legend.ema9?.toLocaleString('en-IN')}
+          </span>
+          <span className="px-1.5 py-0.2 rounded bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 text-[10px] font-bold">
+            20 EMA: ₹{legend.ema20?.toLocaleString('en-IN')}
+          </span>
+          <a
+            href="https://www.tradingview.com/chart/?symbol=NSE%3ANIFTY"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] text-zinc-400 hover:text-emerald-400 flex items-center gap-1 transition underline cursor-pointer"
+            title="Open official TradingView site"
+          >
+            <span>TradingView ↗</span>
+          </a>
+        </div>
+      </div>
+
+      {/* Main Lightweight Canvas Container */}
+      <div className="w-full flex-1 relative bg-[#09090b]">
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-20">
+            <div className="flex items-center gap-2 text-emerald-400 font-mono text-xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+              <span>Loading Nifty 50 5m Real Candles...</span>
+            </div>
+          </div>
+        )}
+        <div ref={chartContainerRef} className="w-full h-full" />
+      </div>
+    </div>
   );
 });
 
@@ -2826,31 +2997,9 @@ export default function App() {
               <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
                 {/* Left Side: Real-time Embedded TradingView Chart (7 Cols) */}
                 <div className="lg:col-span-7 h-full flex flex-col border-b lg:border-b-0 lg:border-r border-zinc-800 relative bg-black">
-                  {/* Dedicated Chart Header */}
-                  <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-950/90 border-b border-zinc-800 text-xs shrink-0 z-10">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-zinc-100 flex items-center gap-1.5">
-                        <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>🇮🇳 NIFTY 50 (NSE)</span>
-                      </span>
-                      <span className="text-[10.5px] px-2 py-0.2 rounded bg-emerald-950/70 border border-emerald-500/50 text-emerald-300 font-mono font-bold">
-                        5-Minute Quant Model
-                      </span>
-                    </div>
-                    <a
-                      href="https://www.tradingview.com/chart/?symbol=NSE%3ANIFTY"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10.5px] text-zinc-400 hover:text-emerald-400 flex items-center gap-1 transition"
-                      title="Open interactive TradingView chart"
-                    >
-                      <span>TradingView ↗</span>
-                    </a>
-                  </div>
-
-                  {/* Official TradingView Nifty 50 Interactive Advanced Chart Widget */}
-                  <div className="w-full flex-1 relative bg-black overflow-hidden">
-                    <TradingViewNiftyChart />
+                  {/* Real-time Nifty 50 5m Candlestick Chart with 9 & 20 EMA (TradingView Lightweight Engine) */}
+                  <div className="w-full flex-1 relative bg-black overflow-hidden flex flex-col">
+                    <NiftyLightweightChart livePrice={botState?.livePrice} isRunning={botState?.isRunning} />
                   </div>
 
                   {/* Floating Chart Watermark */}
