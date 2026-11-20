@@ -90,6 +90,62 @@ const compressImage = (base64Str, maxWidth = 1920, quality = 0.88) => {
   });
 };
 
+// Dedicated Official TradingView Advanced Interactive Chart Component for Nifty 50 (NSE)
+const TradingViewNiftyChart = React.memo(() => {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    const widgetDiv = document.createElement('div');
+    widgetDiv.className = 'tradingview-widget-container__widget';
+    widgetDiv.style.height = '100%';
+    widgetDiv.style.width = '100%';
+    container.appendChild(widgetDiv);
+
+    const script = document.createElement('script');
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+    script.type = 'text/javascript';
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+      autosize: true,
+      symbol: 'NSE:NIFTY',
+      interval: '5',
+      timezone: 'Asia/Kolkata',
+      theme: 'dark',
+      style: '1',
+      locale: 'in',
+      enable_publishing: false,
+      allow_symbol_change: true,
+      hide_top_toolbar: false,
+      hide_legend: false,
+      save_image: false,
+      calendar: false,
+      hide_volume: false,
+      support_host: 'https://www.tradingview.com'
+    });
+
+    container.appendChild(script);
+
+    return () => {
+      if (container) {
+        container.innerHTML = '';
+      }
+    };
+  }, []);
+
+  return (
+    <div
+      className="tradingview-widget-container w-full h-full relative"
+      ref={containerRef}
+      style={{ height: '100%', width: '100%' }}
+    />
+  );
+});
+
 export default function App() {
   // Sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -2770,14 +2826,35 @@ export default function App() {
               <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
                 {/* Left Side: Real-time Embedded TradingView Chart (7 Cols) */}
                 <div className="lg:col-span-7 h-full flex flex-col border-b lg:border-b-0 lg:border-r border-zinc-800 relative bg-black">
-                  <iframe
-                    key="NSE_NIFTY_CHART"
-                    src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_bot&symbol=NSE%3ANIFTY&interval=5&hidesidetoolbar=0&symboledit=1&saveimage=0&toolbarbg=111113&theme=dark&style=1&timezone=Asia%2FKolkata&locale=en"
-                    className="w-full flex-1 border-0"
-                    title="Live TradingView Autonomous Browser View - NSE Nifty 50"
-                  />
+                  {/* Dedicated Chart Header */}
+                  <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-950/90 border-b border-zinc-800 text-xs shrink-0 z-10">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-zinc-100 flex items-center gap-1.5">
+                        <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>🇮🇳 NIFTY 50 (NSE)</span>
+                      </span>
+                      <span className="text-[10.5px] px-2 py-0.2 rounded bg-emerald-950/70 border border-emerald-500/50 text-emerald-300 font-mono font-bold">
+                        5-Minute Quant Model
+                      </span>
+                    </div>
+                    <a
+                      href="https://www.tradingview.com/chart/?symbol=NSE%3ANIFTY"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10.5px] text-zinc-400 hover:text-emerald-400 flex items-center gap-1 transition"
+                      title="Open interactive TradingView chart"
+                    >
+                      <span>TradingView ↗</span>
+                    </a>
+                  </div>
+
+                  {/* Official TradingView Nifty 50 Interactive Advanced Chart Widget */}
+                  <div className="w-full flex-1 relative bg-black overflow-hidden">
+                    <TradingViewNiftyChart />
+                  </div>
+
                   {/* Floating Chart Watermark */}
-                  <div className="absolute top-3 right-3 bg-zinc-950/80 border border-emerald-500/40 px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold pointer-events-none flex items-center gap-1.5 backdrop-blur-md">
+                  <div className="absolute top-10 right-3 bg-zinc-950/80 border border-emerald-500/40 px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold pointer-events-none flex items-center gap-1.5 backdrop-blur-md z-10">
                     {botState?.isRunning ? (
                       <>
                         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
