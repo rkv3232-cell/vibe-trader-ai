@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getSystemPrompt, TRADING_MODES, REPOSITORIES_REGISTRY } from './tradingEngine.js';
+import { getSystemPrompt, TRADING_MODES, REPOSITORIES_REGISTRY, QUANT_POWERHOUSE_REPOS } from './tradingEngine.js';
 import { autonomousBot } from './autonomousTrader.js';
 import { traderMemory } from './traderMemory.js';
 
@@ -621,6 +621,53 @@ app.post('/api/bot/rule/toggle', (req, res) => {
 app.delete('/api/bot/rule/:id', (req, res) => {
   const removed = traderMemory.deleteRule(req.params.id);
   res.json({ success: true, removed, memory: traderMemory.getState() });
+});
+
+// ==========================================
+// 6-REPO INSTITUTIONAL QUANT POWERHOUSE ENDPOINTS
+// 1. TauricResearch/TradingAgents
+// 2. freqtrade/freqtrade
+// 3. kernc/backtesting.py
+// 4. polakowo/vectorbt
+// 5. QuantConnect/Lean
+// 6. nautechsystems/nautilus_trader
+// ==========================================
+
+// GET 6-Repo Quant Powerhouse Architecture & Metadata
+app.get('/api/quant/powerhouse', (req, res) => {
+  res.json({
+    frameworks: QUANT_POWERHOUSE_REPOS,
+    state: autonomousBot.getState().quantPowerhouse,
+    metrics: autonomousBot.computeQuantMetrics()
+  });
+});
+
+// POST Run TauricResearch/TradingAgents 5-Agent Committee Debate on Nifty 50
+app.post('/api/quant/tradingagents-debate', async (req, res) => {
+  try {
+    const debate = await autonomousBot.runTradingAgentsDebate();
+    res.json({ success: true, debate, state: autonomousBot.getState() });
+  } catch (err) {
+    console.error('TradingAgents debate error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST Run polakowo/vectorbt Vectorized 5m Nifty Backtest
+app.post('/api/quant/vectorbt-backtest', async (req, res) => {
+  try {
+    const { bars = 76 } = req.body || {};
+    const result = await autonomousBot.runVectorBtSimulation(Number(bars) || 76);
+    res.json({ success: true, result, state: autonomousBot.getState() });
+  } catch (err) {
+    console.error('VectorBT backtest error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET kernc/backtesting.py Real-Time Quant Metrics
+app.get('/api/quant/metrics', (req, res) => {
+  res.json(autonomousBot.computeQuantMetrics());
 });
 
 // Production: Serve static built frontend from /dist for 24/7 Cloud Hosting

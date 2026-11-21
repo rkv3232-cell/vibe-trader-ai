@@ -1,5 +1,5 @@
 {
-  "isRunning": true,
+  "isRunning": false,
   "tradingMode": "TURBO",
   "riskPerTradePct": 0.05,
   "riskRewardRatio": 2.5,
@@ -20,7 +20,7 @@
   "tradeHistory": [],
   "activeAssetKey": "NIFTY50",
   "dailyStats": {
-    "date": "2026-11-20",
+    "date": "2026-11-21",
     "tradesCount": 0,
     "lossCount": 0,
     "winCount": 0,
@@ -29,94 +29,11 @@
   },
   "logs": [
     {
-      "time": "20:30:00",
+      "time": "09:07:53",
       "category": "SYSTEM",
-      "message": "🇮🇳 Autonomous Trader locked exclusively to NSE Nifty 50 Index. Ready for disciplined compounding.",
-      "id": 1795180000000
+      "message": "Autonomous Human Trader Engine initialized. Ready to trade 24/7.",
+      "id": 1795232273799.3777
     }
   ],
-      "category": "CONFIG",
-      "message": "🚀 ACTIVATED TURBO 10X GROWTH MODE: 5% Compounding Risk per trade! Target: ₹10k–₹25k+ runner wins!",
-      "id": 1795018098571.398
-    },
-    {
-      "time": "21:38:18",
-      "category": "CONFIG",
-      "message": "🛡️ ACTIVATED DISCIPLINED MODE: 1% Risk per trade. Maximum capital preservation.",
-      "id": 1795018098570.7646
-    },
-    {
-      "time": "21:38:18",
-      "category": "CONFIG",
-      "message": "🚀 ACTIVATED TURBO 10X GROWTH MODE: 5% Compounding Risk per trade! Target: ₹10k–₹25k+ runner wins!",
-      "id": 1795018098569.5432
-    },
-    {
-      "time": "21:38:18",
-      "category": "SYSTEM",
-      "message": "Autonomous Human Trader Engine initialized. Ready to trade 24/7.",
-      "id": 1795018098567.03
-    },
-    {
-      "time": "21:38:18",
-      "category": "SYSTEM",
-      "message": "🌅 New Trading Day (2026-11-18 IST). Daily Circuit Breaker and trade limits refreshed.",
-      "id": 1795018098567.718
-    },
-    {
-      "time": "19:24:36",
-      "category": "MIND",
-      "message": "Watching Gold (PAXG/USD) at 3885.37. Trend: BEARISH | 9 EMA: 3903.81 | 20 EMA: 3915.55 | RSI: 10.8. Today: 0/10 trades (0/2 losses).",
-      "id": 1794491676000.3943
-    },
-    {
-      "time": "19:24:35",
-      "category": "SYSTEM",
-      "message": "🟢 24/7 Autonomous Human Trader STARTED on Gold (PAXG/USD).",
-      "id": 1794491675189.3347
-    },
-    {
-      "time": "19:24:34",
-      "category": "SYSTEM",
-      "message": "Autonomous Human Trader Engine initialized. Ready to trade 24/7.",
-      "id": 1794491674173.914
-    },
-    {
-      "time": "19:24:34",
-      "category": "SYSTEM",
-      "message": "🌅 New Trading Day (2026-11-12 IST). Daily Circuit Breaker and trade limits refreshed.",
-      "id": 1794491674173.7224
-    },
-    {
-      "time": "20:32:50",
-      "category": "MEMORY_GATE",
-      "message": "🛡️ Setup avoided by Learned Rule: Rule Enforced [TRAINED_BY_RAJ]: \"US CPI news release ke dauran Gold (XAUUSD) mein trading se bacho, kyunki high volatility aur unpredictable price movements ka risk rehta hai.\" (US High Volatility News Window Active)",
-      "id": 1794063770762.6477
-    },
-    {
-      "time": "20:32:49",
-      "category": "SYSTEM",
-      "message": "🟢 24/7 Autonomous Human Trader STARTED on Gold (PAXG/USD).",
-      "id": 1794063769895.5725
-    },
-    {
-      "time": "20:32:48",
-      "category": "SYSTEM",
-      "message": "Autonomous Human Trader Engine initialized. Ready to trade 24/7.",
-      "id": 1794063768885.0806
-    },
-    {
-      "time": "17:10:00",
-      "category": "SYSTEM",
-      "message": "🟢 24/7 Dynamic Trailing Profit Engine Activated! Target: ₹4,000–₹5,000+ uncapped runners with ₹2,000 Daily Loss Circuit Breaker.",
-      "id": 1794052200000
-    },
-    {
-      "time": "17:09:45",
-      "category": "KNOWLEDGE",
-      "message": "🧠 Raj's 4 Master Institutional Rules Ingested. AI Leveled Up to Level 2: Discipline Apprentice 🎯",
-      "id": 1794052185000
-    }
-  ],
-  "updatedAt": "2026-11-18T16:08:18.571Z"
+  "updatedAt": "2026-11-21T03:37:53.800Z"
 }

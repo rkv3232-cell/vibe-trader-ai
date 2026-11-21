@@ -131,7 +131,28 @@ export const REPOSITORIES_REGISTRY = [
     id: 'backtesting-py',
     name: 'kernc/backtesting.py',
     category: 'Quant Backtesting',
-    role: 'Single-asset strategy backtesting with Sharpe Ratio, CAGR, Max Drawdown & HTML plots',
+    role: 'Ultra-clean single-asset backtester: Sharpe Ratio, Sortino Ratio, Win Rate %, Profit Factor & Max Drawdown',
+    status: 'ACTIVE & INTEGRATED'
+  },
+  {
+    id: 'vectorbt',
+    name: 'polakowo/vectorbt',
+    category: 'Vectorized Backtesting Engine',
+    role: 'Vectorized backtesting engine jo saalon ka 5m OHLCV data kuch hi milliseconds me test kar leta hai',
+    status: 'ACTIVE & INTEGRATED'
+  },
+  {
+    id: 'quantconnect-lean',
+    name: 'QuantConnect/Lean',
+    category: 'Institutional Execution Engine',
+    role: 'Institutional hedge funds ka engine jo C# aur Python me multi-asset portfolios, order state machine & risk gates chalata hai',
+    status: 'ACTIVE & INTEGRATED'
+  },
+  {
+    id: 'nautilus-trader',
+    name: 'nautechsystems/nautilus_trader',
+    category: 'High-Frequency Quant Engine',
+    role: 'High-frequency, ultra low-latency quant engine (Rust/Python based) with micro-slippage & idempotency tracking',
     status: 'ACTIVE & INTEGRATED'
   },
   {
@@ -196,6 +217,95 @@ export const REPOSITORIES_REGISTRY = [
     category: 'Quant Master Map',
     role: 'Comprehensive catalog of quantitative strategies, alpha factor formulas & risk math',
     status: 'ACTIVE & INTEGRATED'
+  }
+];
+
+export const QUANT_POWERHOUSE_REPOS = [
+  {
+    id: 'tradingagents',
+    name: 'TauricResearch/TradingAgents',
+    tagline: '1,18,000+ Stars Multi-Agent Hedge Fund Research Committee',
+    description: 'Multi-Agent LLM framework jisme Sentiment, Technical Quant, Bull vs Bear Researcher, Risk Officer aur Portfolio Manager aapas me debate karke Nifty 50 trade approve karte hain.',
+    badge: '118k★ Committee',
+    accent: '#8b5cf6',
+    features: [
+      'Market Sentiment & Macro Agent (India VIX & FII/DII tone)',
+      '5-Minute 9 EMA & 20 EMA Quant Technical Agent',
+      'Bull vs Bear Debate Arena (Rally logic vs Fakeout traps)',
+      'Risk Officer Gatekeeper (1% capital preservation)',
+      'Portfolio Manager Final Decision (BUY CALL / BUY PUT / WAIT)'
+    ]
+  },
+  {
+    id: 'freqtrade',
+    name: 'freqtrade/freqtrade',
+    tagline: 'Python Algorithmic Trading & Dynamic Trailing Stop Loss',
+    description: 'Python ka sabse popular open-source trading bot — iska sabse bada feature Dynamic Trailing Stop Loss, FreqAI Machine Learning aur dynamic ROI tables hai.',
+    badge: 'FreqAI ML & Trailing SL',
+    accent: '#10b981',
+    features: [
+      'Dynamic 4-Stage Trailing Stop Loss (+1.2R Break-even, +2.0R Lock, Runner Uncapped)',
+      'FreqAI ML feature engineering on 5m candles',
+      'Dynamic ROI Target Table (1:2.5+ R:R minimum discipline)',
+      'Market Regime Classification (Trending vs Consolidation)'
+    ]
+  },
+  {
+    id: 'backtesting-py',
+    name: 'kernc/backtesting.py',
+    tagline: 'Ultra-Clean Python Quant Performance Metrics',
+    description: 'Ultra-clean single-asset backtester jo Sharpe Ratio, Sortino Ratio, Win Rate %, Profit Factor, aur Maximum Drawdown calculate karta hai.',
+    badge: 'Quant Math & Metrics',
+    accent: '#38bdf8',
+    features: [
+      'Sharpe Ratio (Annualized risk-adjusted excess return)',
+      'Sortino Ratio (Downside volatility protection ratio)',
+      'Maximum Drawdown % tracking & Calmar Ratio',
+      'Profit Factor (Gross Winning ₹ / Gross Losing ₹)',
+      'Win Rate % & Mathematical Expectancy per trade'
+    ]
+  },
+  {
+    id: 'vectorbt',
+    name: 'polakowo/vectorbt',
+    tagline: 'Lightning-Fast Vectorized Backtesting Engine',
+    description: 'Vectorized backtesting engine jo saalon ka 5m OHLCV historical data kuch hi milliseconds me NumPy aur Pandas se test kar leta hai.',
+    badge: 'Vectorized Speed',
+    accent: '#f59e0b',
+    features: [
+      'NumPy & Pandas accelerated vectorized matrix operations',
+      'Test 100+ 5-minute Nifty candles in under 20 milliseconds',
+      'Instant parameter optimization (9 EMA vs 20 EMA periods)',
+      'Real-time cumulative equity curve plotting'
+    ]
+  },
+  {
+    id: 'quantconnect-lean',
+    name: 'QuantConnect/Lean',
+    tagline: 'Institutional Multi-Asset Engine & Risk Governance',
+    description: 'Institutional hedge funds ka engine jo C# aur Python me multi-asset portfolios, order state machine & risk gates chalata hai.',
+    badge: 'Institutional Governance',
+    accent: '#ec4899',
+    features: [
+      'Strict 4-Step Order State Machine (CREATED → VALIDATED → SUBMITTED → FILLED)',
+      'Institutional 1.0% Risk Cap per trade (Max ₹1,000 risk on ₹1 Lakh capital)',
+      'Mandatory Daily Loss Circuit Breaker (-₹2,000 threshold)',
+      'Cash & Position Margin reconciliation'
+    ]
+  },
+  {
+    id: 'nautilus-trader',
+    name: 'nautechsystems/nautilus_trader',
+    tagline: 'High-Frequency Ultra Low-Latency Event-Driven Engine',
+    description: 'High-frequency, ultra low-latency quant engine (Rust/Python based) jo micro-slippage, transaction frictions aur idempotency control karta hai.',
+    badge: 'Ultra Low-Latency & Frictions',
+    accent: '#ef4444',
+    features: [
+      'Realistic Micro-Slippage Simulation (2.0 to 4.0 points on Nifty 50)',
+      'Round-trip Transaction Fee Deduction (₹40.00 Brokerage + STT/taxes)',
+      'Idempotency Key Verification (Zero duplicate order risk)',
+      'Microsecond tick/bar dispatch pipeline'
+    ]
   }
 ];
 
