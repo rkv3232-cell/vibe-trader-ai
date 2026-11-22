@@ -1232,6 +1232,16 @@ export class AutonomousTrader {
       return { success: false, message: 'Position already open! Close it or let trailing ride.', state: this.getState() };
     }
 
+    // Strict Market Hours Guard: Do not allow trades when NSE Market is Closed (Saturday/Sunday or off-hours)
+    if (!this.isMarketInSession(this.activeAssetKey)) {
+      this.addLog('SYSTEM', '🛑 Blocked manual trade attempt: NSE Nifty 50 market is closed on weekends (Opens Mon 9:15 AM).');
+      return {
+        success: false,
+        message: '🛑 NSE Nifty 50 Market Closed! Indian stock market operates Mon-Fri 09:15 - 15:30 IST. Weekend trading is strictly disabled.',
+        state: this.getState()
+      };
+    }
+
     if (!this.isRunning) {
       this.start();
     }

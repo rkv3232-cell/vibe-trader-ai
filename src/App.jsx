@@ -3124,11 +3124,11 @@ export default function App() {
                         <div className="grid grid-cols-3 gap-2 text-[11px] font-mono bg-zinc-900/80 p-2 rounded-lg border border-zinc-800">
                           <div>
                             <div className="text-[10px] text-zinc-500">Entry</div>
-                            <div className="text-zinc-200 font-bold">${botState.activePosition.entryPrice}</div>
+                            <div className="text-zinc-200 font-bold">₹{botState.activePosition.entryPrice}</div>
                           </div>
                           <div>
                             <div className="text-[10px] text-rose-400 font-semibold">Stop Loss</div>
-                            <div className="text-rose-300 font-bold">${botState.activePosition.stopLoss}</div>
+                            <div className="text-rose-300 font-bold">₹{botState.activePosition.stopLoss}</div>
                           </div>
                           <div>
                             <div className="text-[10px] text-emerald-400 font-semibold">
@@ -3136,7 +3136,7 @@ export default function App() {
                                 ? 'Next Target'
                                 : 'Target (1:2)'}
                             </div>
-                            <div className="text-emerald-300 font-bold">${botState.activePosition.targetPrice}</div>
+                            <div className="text-emerald-300 font-bold">₹{botState.activePosition.targetPrice}</div>
                           </div>
                         </div>
 
@@ -3240,13 +3240,19 @@ export default function App() {
                             <div className="text-[10px] text-zinc-400 max-w-sm mt-1 flex items-center justify-center gap-2">
                               <span>Target: ₹4k–₹12k+ • Today: {botState?.dailyStats?.tradesCount || 0} trades</span>
                               <span>•</span>
-                              <button
-                                onClick={handleForceTrade}
-                                className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 underline cursor-pointer hover:bg-emerald-500/10 px-1.5 py-0.5 rounded transition"
-                                title="Abhi turant live EMA trend par instant trade execute karein"
-                              >
-                                ⚡ Instant Trade Test
-                              </button>
+                              {botState?.scannerStatus?.includes('Closed') ? (
+                                <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-950/60 border border-amber-500/30 px-2 py-0.5 rounded flex items-center gap-1">
+                                  <span>🔒 Weekend Closed (Mon 9:15 AM)</span>
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={handleForceTrade}
+                                  className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 underline cursor-pointer hover:bg-emerald-500/10 px-1.5 py-0.5 rounded transition"
+                                  title="Abhi turant live EMA trend par instant trade execute karein"
+                                >
+                                  ⚡ Instant Trade Test
+                                </button>
+                              )}
                             </div>
                           </div>
                         )}
@@ -3338,7 +3344,7 @@ export default function App() {
                                 <span className="text-zinc-500">({tr.type})</span>
                               </div>
                               <div className="flex items-center gap-3 font-mono">
-                                <span className="text-zinc-400">${tr.entryPrice} → ${tr.exitPrice}</span>
+                                <span className="text-zinc-400">₹{tr.entryPrice} → ₹{tr.exitPrice}</span>
                                 <span className={`font-bold ${tr.isWin ? 'text-emerald-400' : 'text-rose-400'}`}>
                                   {tr.pnlFormatted}
                                 </span>
