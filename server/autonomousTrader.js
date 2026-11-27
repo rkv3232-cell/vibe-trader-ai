@@ -78,11 +78,16 @@ export class AutonomousTrader {
     this.geminiCaller = null;
 
     // Trading Engine Modes:
-    // 'TURBO' = 5% Compounding Risk (Rapid growth toward ₹1 Million, ₹5k+ wins)
-    // 'DISCIPLINED' = 1% Risk (₹1,000 max loss, safe institutional capital shield)
-    this.tradingMode = 'TURBO';
-    this.riskPerTradePct = 0.05; // 5% Risk per trade for aggressive compounding!
-    this.riskRewardRatio = 2.5;  // 1:2.5+ R:R target (₹12,500+ wins on ₹100k)
+    // 'DISCIPLINED' = 1% Risk (₹1,000 max loss, safe institutional capital shield - DEFAULT)
+    // 'TURBO' = 5% Compounding Risk (High-volatility growth mode)
+    this.tradingMode = 'DISCIPLINED';
+    this.riskPerTradePct = 0.01; // 1% Risk per trade (Strict Institutional Capital Shield)
+    this.riskRewardRatio = 2.2;  // 1:2.2+ R:R target (₹2,200+ wins on ₹1,000 risk)
+
+    // Anti-Whipsaw & Cooldown Controls
+    this.lastTradeClosedTime = 0;
+    this.consecutiveLosses = 0;
+    this.consecutiveLossCooldownUntil = 0;
 
     // Indicator history for EMA / RSI calculations
     this.priceTicks = [];
@@ -875,12 +880,24 @@ export class AutonomousTrader {
 
     this.wallet.winRate = Number(((this.wallet.winCount / this.wallet.totalTrades) * 100).toFixed(1));
 
+    // Update Post-Trade Cooldown Timestamp
+    this.lastTradeClosedTime = Date.now();
+
     // Update Daily Stats & Circuit Breaker
     this.dailyStats.tradesCount += 1;
     this.dailyStats.realizedPnL = Number((this.dailyStats.realizedPnL + finalPnL).toFixed(2));
     if (isWin) {
       this.dailyStats.winCount += 1;
+      this.consecutiveLosses = 0; // Reset consecutive loss streak
     } else {
+      // Track consecutive losses
+      this.consecutiveLosses = (this.consecutiveLosses || 0) + 1;
+      if (this.consecutiveLosses >= 2) {
+        // Freeze trading for 2 hours (120 minutes)
+        this.consecutiveLossCooldownUntil = Date.now() + (120 * 60 * 1000);
+        this.addLog('CIRCUIT_BREAKER', `🛑 2 Consecutive Losses Hit! Anti-Chop Protection activated: Trading frozen for 2 hours to avoid whipsaw.`);
+      }
+
       // Only full stop losses (or heavy losses >= 70% of risk) count toward the daily circuit breaker
       const maxLossCount = this.tradingMode === 'TURBO' ? 3 : 2;
       const heavyLossThreshold = (this.wallet.balance * this.riskPerTradePct * 0.7) || 800;
@@ -1015,6 +1032,22 @@ export class AutonomousTrader {
       return;
     }
 
+    // 0. Cooldown Gate: Minimum 15 minutes between trades (prevents rapid churn & revenge trading)
+    const timeSinceLastTrade = Date.now() - (this.lastTradeClosedTime || 0);
+    const minCooldownMs = 15 * 60 * 1000;
+    if (this.lastTradeClosedTime && timeSinceLastTrade < minCooldownMs) {
+      const remainingMins = Math.ceil((minCooldownMs - timeSinceLastTrade) / 60000);
+      this.scannerStatus = `⏱️ Post-Trade Cooldown Active: Waiting ${remainingMins}m for market structure to settle.`;
+      return;
+    }
+
+    // 0.1 Consecutive Loss Circuit Breaker: 2 consecutive losses = 2-hour trading freeze
+    if (this.consecutiveLossCooldownUntil && Date.now() < this.consecutiveLossCooldownUntil) {
+      const remainingMins = Math.ceil((this.consecutiveLossCooldownUntil - Date.now()) / 60000);
+      this.scannerStatus = `🛑 Anti-Chop Freeze Active (2 consecutive losses): Paused for ${remainingMins}m to protect capital.`;
+      return;
+    }
+
     // 1. Daily Circuit Breaker Check (Strict Risk Shield: 2 losses = halt for the day)
     if (this.dailyStats.lossCount >= 2) {
       this.scannerStatus = '🛑 Daily Circuit Breaker Active: 2 losses hit today (-₹2,000 max drawdown). Capital 100% protected.';
@@ -1041,8 +1074,16 @@ export class AutonomousTrader {
     const rsi = struct.rsi;
     const trend = struct.trend; // 'BULLISH' or 'BEARISH'
 
+    // 3.1 Sideways / Chop Filter: Minimum 8.0 points separation on Nifty 50 to confirm a real trending regime!
+    const emaSpread = Math.abs(ema9 - ema20);
+    const minSpread = 8.0;
+    if (emaSpread < minSpread) {
+      this.scannerStatus = `⚠️ Dead Zone Chop: 9 EMA & 20 EMA are compressed (Δ ₹${emaSpread.toFixed(1)} < ₹${minSpread} pts). Sitting on hands.`;
+      return;
+    }
+
     // Update real-time radar scanning status with live Trend & EMAs
-    this.scannerStatus = `Radar Active: Watching ${asset.name} @ ₹${currentPrice} | Trend: ${trend === 'BEARISH' ? '🔴 DOWNTREND (SELL BIAS)' : '🟢 UPTREND (BUY BIAS)'} (9 EMA: ₹${ema9} | 20 EMA: ₹${ema20} | RSI: ${rsi})`;
+    this.scannerStatus = `Radar Active: Watching ${asset.name} @ ₹${currentPrice} | Trend: ${trend === 'BEARISH' ? '🔴 DOWNTREND (SELL BIAS)' : '🟢 UPTREND (BUY BIAS)'} (9 EMA: ₹${ema9} | 20 EMA: ₹${ema20} | Spread: ₹${emaSpread.toFixed(1)} pts | RSI: ${rsi})`;
 
     // Periodic Continuous AI Market Structure Study (~every 3-4 minutes)
     this.cycleCounter = (this.cycleCounter || 0) + 1;
@@ -1055,31 +1096,29 @@ export class AutonomousTrader {
       this.addLog('MIND', `Watching ${asset.name} at ₹${currentPrice}. Trend: ${trend} | 9 EMA: ₹${ema9} | 20 EMA: ₹${ema20} | RSI: ${rsi}. Today: ${this.dailyStats.tradesCount}/10 trades (${this.dailyStats.lossCount}/2 losses).`);
     }
 
-    // Symmetrical Trade Setup Detection (100% equal chance for SELL and BUY)
+    // Symmetrical High-Probability Pullback Setups
     let setupType = null;
 
     // Symmetrical SELL / SHORT Candidate:
-    // In a downtrend (ema9 <= ema20), price tests 20 EMA resistance, RSI healthy (25 to 58)
-    const isBearishSetup = (trend === 'BEARISH' || ema9 <= ema20) &&
-      (currentPrice <= ema20 * 1.004) &&
-      (rsi <= 58 && rsi >= 25);
+    // In strong downtrend (ema9 <= ema20 - minSpread), price pulls back into 20 EMA test zone, RSI healthy
+    const isBearishSetup = (trend === 'BEARISH' && ema9 <= ema20 - minSpread) &&
+      (currentPrice <= ema20 + 6.0 && currentPrice >= ema20 - 25.0) &&
+      (rsi <= 54 && rsi >= 28);
 
     // Symmetrical BUY / LONG Candidate:
-    // In an uptrend (ema9 >= ema20), price tests 20 EMA support, RSI healthy (42 to 75)
-    const isBullishSetup = (trend === 'BULLISH' || ema9 >= ema20) &&
-      (currentPrice >= ema20 * 0.996) &&
-      (rsi >= 42 && rsi <= 75);
+    // In strong uptrend (ema9 >= ema20 + minSpread), price pulls back into 20 EMA test zone, RSI healthy
+    const isBullishSetup = (trend === 'BULLISH' && ema9 >= ema20 + minSpread) &&
+      (currentPrice >= ema20 - 6.0 && currentPrice <= ema20 + 25.0) &&
+      (rsi >= 46 && rsi <= 72);
 
     if (isBearishSetup && !isBullishSetup) {
       setupType = 'SELL';
     } else if (isBullishSetup && !isBearishSetup) {
       setupType = 'BUY';
-    } else if (isBearishSetup && isBullishSetup) {
-      setupType = ema9 < ema20 ? 'SELL' : 'BUY';
     }
 
-    // Responsive trigger filter
-    const triggerNow = Math.random() < 0.65;
+    // Strict setup confirmation: Only trigger when clear quant confluence is met!
+    const triggerNow = setupType !== null;
 
     if (triggerNow && setupType) {
       const type = setupType;
@@ -1118,8 +1157,8 @@ export class AutonomousTrader {
       : Number((currentPrice - slippagePoints).toFixed(asset.decimals));
 
     // Adaptive Volatility Point Sizing for Nifty 50:
-    // Standard intraday stop distance = ~38 points (~₹950 per lot of 25)
-    const stopDistance = 38.0;
+    // Standard intraday stop distance = ~48.0 points (accommodates 5m Nifty ATR breathing room)
+    const stopDistance = 48.0;
     const pointValue = Number((riskAmount / stopDistance).toFixed(4));
     const targetDistance = Number((stopDistance * this.riskRewardRatio).toFixed(asset.decimals));
 
