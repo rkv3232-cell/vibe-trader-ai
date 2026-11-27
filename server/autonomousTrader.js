@@ -440,12 +440,25 @@ export class AutonomousTrader {
     }
   }
 
-  // Fetch real 5-minute candlestick chart data for precise 9 EMA, 20 EMA, RSI & Trend Direction
+  // Fetch real 5-minute candlestick chart data for precise 9 EMA, 20 EMA, RSI, ATR, Swings & Candlestick Patterns
   async fetchMarketStructure(assetKey) {
     const asset = this.assets[assetKey || this.activeAssetKey];
     if (!asset) {
       const fallbackEma = this.calculateEMA(20);
-      return { price: this.livePrice, ema9: fallbackEma, ema20: fallbackEma, rsi: 50, trend: 'BULLISH' };
+      return {
+        price: this.livePrice,
+        ema9: fallbackEma,
+        ema20: fallbackEma,
+        rsi: 50,
+        trend: 'BULLISH',
+        atr: 25.0,
+        swingHigh: this.livePrice + 50,
+        swingLow: this.livePrice - 50,
+        isBullishHammer: false,
+        isBullishEngulfing: false,
+        isShootingStar: false,
+        isBearishEngulfing: false
+      };
     }
 
     // 0. Stock Market 5m Candle Analysis via Yahoo Finance
@@ -458,37 +471,152 @@ export class AutonomousTrader {
         });
         if (res.ok) {
           const data = await res.json();
-          const closes = data?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter(x => typeof x === 'number' && !isNaN(x)) || [];
-          if (closes.length >= 10) {
-            const currentClose = closes[closes.length - 1];
-            let ema9 = closes[0];
-            const k9 = 2 / (9 + 1);
-            for (let i = 1; i < closes.length; i++) ema9 = closes[i] * k9 + ema9 * (1 - k9);
+          const q = data?.chart?.result?.[0]?.indicators?.quote?.[0];
+          const ts = data?.chart?.result?.[0]?.timestamp || [];
 
-            let ema20 = closes[0];
-            const k20 = 2 / (20 + 1);
-            for (let i = 1; i < closes.length; i++) ema20 = closes[i] * k20 + ema20 * (1 - k20);
+          if (q && Array.isArray(q.close)) {
+            const candles = [];
+            for (let i = 0; i < q.close.length; i++) {
+              if (
+                typeof q.open?.[i] === 'number' && !isNaN(q.open[i]) &&
+                typeof q.high?.[i] === 'number' && !isNaN(q.high[i]) &&
+                typeof q.low?.[i] === 'number' && !isNaN(q.low[i]) &&
+                typeof q.close?.[i] === 'number' && !isNaN(q.close[i])
+              ) {
+                candles.push({
+                  time: ts[i] || Math.floor(Date.now() / 1000),
+                  open: q.open[i],
+                  high: q.high[i],
+                  low: q.low[i],
+                  close: q.close[i],
+                  volume: typeof q.volume?.[i] === 'number' ? q.volume[i] : 0
+                });
+              }
+            }
 
-            let gains = 0, losses = 0;
-            const p = Math.min(14, closes.length - 1);
-            for (let i = closes.length - p; i < closes.length; i++) {
-              const diff = closes[i] - closes[i - 1];
-              if (diff >= 0) gains += diff; else losses += Math.abs(diff);
+            if (candles.length >= 15) {
+              const closes = candles.map(c => c.close);
+              const currentClose = closes[closes.length - 1];
+
+              // 1. Compute 9 EMA (Fast institutional momentum)
+              let ema9 = closes[0];
+              const k9 = 2 / (9 + 1);
+              for (let i = 1; i < closes.length; i++) ema9 = closes[i] * k9 + ema9 * (1 - k9);
+
+              // 2. Compute 20 EMA (Primary institutional trend baseline)
+              let ema20 = closes[0];
+              const k20 = 2 / (20 + 1);
+              for (let i = 1; i < closes.length; i++) ema20 = closes[i] * k20 + ema20 * (1 - k20);
+
+              // 3. Compute 14-period RSI
+              let gains = 0, losses = 0;
+              const p = Math.min(14, closes.length - 1);
+              for (let i = closes.length - p; i < closes.length; i++) {
+                const diff = closes[i] - closes[i - 1];
+                if (diff >= 0) gains += diff; else losses += Math.abs(diff);
+              }
+              let rsi = 50.0;
+              if (losses === 0) rsi = 100.0;
+              else {
+                const rs = (gains / p) / (losses / p);
+                rsi = Number((100 - (100 / (1 + rs))).toFixed(1));
+              }
+
+              // 4. Compute 14-period ATR (Average True Range)
+              const trs = [];
+              for (let i = 1; i < candles.length; i++) {
+                const h = candles[i].high;
+                const l = candles[i].low;
+                const prevC = candles[i - 1].close;
+                trs.push(Math.max(h - l, Math.abs(h - prevC), Math.abs(l - prevC)));
+              }
+              const atrPeriod = Math.min(14, trs.length);
+              let atr = trs.slice(0, atrPeriod).reduce((a, b) => a + b, 0) / atrPeriod;
+              for (let i = atrPeriod; i < trs.length; i++) {
+                atr = (atr * (atrPeriod - 1) + trs[i]) / atrPeriod;
+              }
+              atr = Number((atr || 25.0).toFixed(2));
+
+              // 5. Recent Swing High & Swing Low (last 10 candles)
+              const lookback = candles.slice(-12, -1);
+              const swingHigh = Math.max(...lookback.map(c => c.high));
+              const swingLow = Math.min(...lookback.map(c => c.low));
+
+              // 6. Candlestick Price Action Rejection Physics (Latest bar vs Previous bar)
+              const lastCandle = candles[candles.length - 1];
+              const prevCandle = candles[candles.length - 2] || lastCandle;
+
+              const range = Math.max(1, lastCandle.high - lastCandle.low);
+              const body = Math.abs(lastCandle.close - lastCandle.open);
+              const upperWick = lastCandle.high - Math.max(lastCandle.open, lastCandle.close);
+              const lowerWick = Math.min(lastCandle.open, lastCandle.close) - lastCandle.low;
+
+              // Bullish Rejection Hammer / Absorption:
+              // Long lower shadow (>= 1.4x body & >= 40% of range), small upper shadow, low touched/tested 20 EMA, close >= 20 EMA
+              const isBullishHammer = (
+                range >= 8.0 &&
+                lowerWick >= 1.4 * body &&
+                lowerWick >= 0.40 * range &&
+                upperWick <= 0.35 * range &&
+                lastCandle.low <= ema20 + 8.0 &&
+                lastCandle.close >= ema20
+              );
+
+              // Bullish Engulfing:
+              // Current candle is green, prev was red, current body engulfs prev body, closes above 20 EMA
+              const isBullishEngulfing = (
+                lastCandle.close > lastCandle.open &&
+                prevCandle.close < prevCandle.open &&
+                lastCandle.close >= prevCandle.open &&
+                lastCandle.open <= prevCandle.close &&
+                lastCandle.close >= ema20 &&
+                lastCandle.low <= ema20 + 8.0
+              );
+
+              // Bearish Rejection Shooting Star / Supply Trap:
+              // Long upper shadow (>= 1.4x body & >= 40% of range), small lower shadow, high spiked/tested 20 EMA, close <= 20 EMA
+              const isShootingStar = (
+                range >= 8.0 &&
+                upperWick >= 1.4 * body &&
+                upperWick >= 0.40 * range &&
+                lowerWick <= 0.35 * range &&
+                lastCandle.high >= ema20 - 8.0 &&
+                lastCandle.close <= ema20
+              );
+
+              // Bearish Engulfing:
+              // Current candle is red, prev was green, current body engulfs prev body, closes below 20 EMA
+              const isBearishEngulfing = (
+                lastCandle.close < lastCandle.open &&
+                prevCandle.close > prevCandle.open &&
+                lastCandle.close <= prevCandle.open &&
+                lastCandle.open >= prevCandle.close &&
+                lastCandle.close <= ema20 &&
+                lastCandle.high >= ema20 - 8.0
+              );
+
+              const trend = ema9 >= ema20 ? 'BULLISH' : 'BEARISH';
+              return {
+                price: currentClose,
+                ema9: Number(ema9.toFixed(asset.decimals)),
+                ema20: Number(ema20.toFixed(asset.decimals)),
+                rsi,
+                trend,
+                atr,
+                swingHigh: Number(swingHigh.toFixed(asset.decimals)),
+                swingLow: Number(swingLow.toFixed(asset.decimals)),
+                isBullishHammer,
+                isBullishEngulfing,
+                isShootingStar,
+                isBearishEngulfing,
+                rejectionDetails: {
+                  body: Number(body.toFixed(1)),
+                  upperWick: Number(upperWick.toFixed(1)),
+                  lowerWick: Number(lowerWick.toFixed(1)),
+                  range: Number(range.toFixed(1))
+                }
+              };
             }
-            let rsi = 50.0;
-            if (losses === 0) rsi = 100.0;
-            else {
-              const rs = (gains / p) / (losses / p);
-              rsi = Number((100 - (100 / (1 + rs))).toFixed(1));
-            }
-            const trend = ema9 >= ema20 ? 'BULLISH' : 'BEARISH';
-            return {
-              price: currentClose,
-              ema9: Number(ema9.toFixed(asset.decimals)),
-              ema20: Number(ema20.toFixed(asset.decimals)),
-              rsi,
-              trend
-            };
           }
         }
       } catch (e) {
@@ -1073,17 +1201,75 @@ export class AutonomousTrader {
     const ema20 = struct.ema20;
     const rsi = struct.rsi;
     const trend = struct.trend; // 'BULLISH' or 'BEARISH'
-
-    // 3.1 Sideways / Chop Filter: Minimum 8.0 points separation on Nifty 50 to confirm a real trending regime!
+    const atr = struct.atr || 25.0;
     const emaSpread = Math.abs(ema9 - ema20);
     const minSpread = 8.0;
+
+    // 3.1 Sideways / Chop Filter: Minimum 8.0 points separation on Nifty 50 to confirm a real trending regime!
     if (emaSpread < minSpread) {
-      this.scannerStatus = `⚠️ Dead Zone Chop: 9 EMA & 20 EMA are compressed (Δ ₹${emaSpread.toFixed(1)} < ₹${minSpread} pts). Sitting on hands.`;
+      this.scannerStatus = `⚠️ Dead Zone Chop: 9 EMA & 20 EMA are compressed (Δ ₹${emaSpread.toFixed(1)} < ₹${minSpread} pts). Bot is sitting on hands to prevent whipsaw (Zero Guesswork).`;
       return;
     }
 
-    // Update real-time radar scanning status with live Trend & EMAs
-    this.scannerStatus = `Radar Active: Watching ${asset.name} @ ₹${currentPrice} | Trend: ${trend === 'BEARISH' ? '🔴 DOWNTREND (SELL BIAS)' : '🟢 UPTREND (BUY BIAS)'} (9 EMA: ₹${ema9} | 20 EMA: ₹${ema20} | Spread: ₹${emaSpread.toFixed(1)} pts | RSI: ${rsi})`;
+    // Candlestick Pattern Triggers
+    const isBullishAction = struct.isBullishHammer || struct.isBullishEngulfing;
+    const isBearishAction = struct.isShootingStar || struct.isBearishEngulfing;
+
+    // Symmetrical High-Probability Pullback Setups (100% Deterministic Quant Execution - ZERO TUKKA)
+    let setupType = null;
+    let patternName = null;
+
+    // Symmetrical BUY / LONG Candidate:
+    // 1. Confirmed Uptrend: 9 EMA >= 20 EMA + 8.0 pts
+    // 2. Candlestick Price Action: Tested 20 EMA and formed Bullish Hammer / Pinbar OR Bullish Engulfing
+    // 3. 20 EMA Support Zone: within 28 pts of 20 EMA
+    // 4. RSI Sweet Spot: 45 to 68
+    // 5. Room to swing: not slamming into major swing resistance
+    if (
+      trend === 'BULLISH' &&
+      (ema9 >= ema20 + minSpread) &&
+      isBullishAction &&
+      (currentPrice >= ema20 - 6.0 && currentPrice <= ema20 + 28.0) &&
+      (rsi >= 45 && rsi <= 68) &&
+      (currentPrice < (struct.swingHigh || 999999) - 8.0)
+    ) {
+      setupType = 'BUY';
+      patternName = struct.isBullishHammer
+        ? 'Bullish Hammer / Pinbar Rejection at 20 EMA'
+        : 'Bullish Engulfing at 20 EMA Support';
+    }
+
+    // Symmetrical SELL / SHORT Candidate:
+    // 1. Confirmed Downtrend: 9 EMA <= 20 EMA - 8.0 pts
+    // 2. Candlestick Price Action: Tested 20 EMA and formed Shooting Star / Inverted Pinbar OR Bearish Engulfing
+    // 3. 20 EMA Resistance Zone: within 28 pts of 20 EMA
+    // 4. RSI Sweet Spot: 32 to 55
+    // 5. Room to swing: not bouncing off major swing support
+    if (
+      trend === 'BEARISH' &&
+      (ema9 <= ema20 - minSpread) &&
+      isBearishAction &&
+      (currentPrice <= ema20 + 6.0 && currentPrice >= ema20 - 28.0) &&
+      (rsi <= 55 && rsi >= 32) &&
+      (currentPrice > (struct.swingLow || 0) + 8.0)
+    ) {
+      setupType = 'SELL';
+      patternName = struct.isShootingStar
+        ? 'Shooting Star Rejection at 20 EMA'
+        : 'Bearish Engulfing at 20 EMA Resistance';
+    }
+
+    if (!setupType) {
+      const neededAction = trend === 'BULLISH' ? 'Bullish Hammer / Pinbar at 20 EMA' : 'Shooting Star / Supply Trap at 20 EMA';
+      this.scannerStatus = `Radar Active: Watching ${asset.name} @ ₹${currentPrice} | Trend: ${trend === 'BEARISH' ? '🔴 DOWNTREND' : '🟢 UPTREND'} (9 EMA: ₹${ema9} | 20 EMA: ₹${ema20} | Spread: ₹${emaSpread.toFixed(1)} pts | RSI: ${rsi}) | Awaiting ${neededAction}. Zero Guesswork / Pure Price Action.`;
+
+      // Periodic Continuous AI Market Structure Study (~every 3-4 minutes)
+      this.cycleCounter = (this.cycleCounter || 0) + 1;
+      if (this.cycleCounter % 30 === 0 && this.geminiCaller) {
+        this.runMarketStudy(asset, currentPrice, ema20, rsi);
+      }
+      return;
+    }
 
     // Periodic Continuous AI Market Structure Study (~every 3-4 minutes)
     this.cycleCounter = (this.cycleCounter || 0) + 1;
@@ -1093,34 +1279,10 @@ export class AutonomousTrader {
 
     // Human thought logs
     if (Math.random() < 0.28) {
-      this.addLog('MIND', `Watching ${asset.name} at ₹${currentPrice}. Trend: ${trend} | 9 EMA: ₹${ema9} | 20 EMA: ₹${ema20} | RSI: ${rsi}. Today: ${this.dailyStats.tradesCount}/10 trades (${this.dailyStats.lossCount}/2 losses).`);
+      this.addLog('MIND', `Confirmed setup on ${asset.name} at ₹${currentPrice}: ${patternName}. Trend: ${trend} | Spread: ₹${emaSpread.toFixed(1)} pts | RSI: ${rsi}.`);
     }
 
-    // Symmetrical High-Probability Pullback Setups
-    let setupType = null;
-
-    // Symmetrical SELL / SHORT Candidate:
-    // In strong downtrend (ema9 <= ema20 - minSpread), price pulls back into 20 EMA test zone, RSI healthy
-    const isBearishSetup = (trend === 'BEARISH' && ema9 <= ema20 - minSpread) &&
-      (currentPrice <= ema20 + 6.0 && currentPrice >= ema20 - 25.0) &&
-      (rsi <= 54 && rsi >= 28);
-
-    // Symmetrical BUY / LONG Candidate:
-    // In strong uptrend (ema9 >= ema20 + minSpread), price pulls back into 20 EMA test zone, RSI healthy
-    const isBullishSetup = (trend === 'BULLISH' && ema9 >= ema20 + minSpread) &&
-      (currentPrice >= ema20 - 6.0 && currentPrice <= ema20 + 25.0) &&
-      (rsi >= 46 && rsi <= 72);
-
-    if (isBearishSetup && !isBullishSetup) {
-      setupType = 'SELL';
-    } else if (isBullishSetup && !isBearishSetup) {
-      setupType = 'BUY';
-    }
-
-    // Strict setup confirmation: Only trigger when clear quant confluence is met!
-    const triggerNow = setupType !== null;
-
-    if (triggerNow && setupType) {
+    if (setupType) {
       const type = setupType;
 
       // Experience Check: Verify candidate setup against permanently learned rules
@@ -1138,15 +1300,15 @@ export class AutonomousTrader {
         this.addLog('MEMORY_GATE', `🛡️ Setup avoided by Learned Rule: ${ruleCheck.reason}`);
         return;
       }
-      this.addLog('KNOWLEDGE', `✅ All ${traderMemory.learnedRules.length} learned rules verified. Risk & structure approved for ${type}.`);
+      this.addLog('KNOWLEDGE', `✅ All ${traderMemory.learnedRules.length} learned rules verified. Risk & structure approved for ${type} (${patternName}).`);
 
-      this.executeTradeOrder(type, currentPrice, ema9, ema20, rsi, trend, false);
+      this.executeTradeOrder(type, currentPrice, ema9, ema20, rsi, trend, atr, patternName, false);
       return;
     }
   }
 
   // Execute a standardized virtual trade order (Used both autonomously & on instant manual trigger)
-  executeTradeOrder(type, currentPrice, ema9, ema20, rsi, trend, isForced = false) {
+  executeTradeOrder(type, currentPrice, ema9, ema20, rsi, trend, atr = 25.0, patternName = null, isForced = false) {
     const asset = this.assets[this.activeAssetKey] || this.assets.NIFTY50;
     const riskAmount = Number((this.wallet.balance * this.riskPerTradePct).toFixed(2));
 
@@ -1156,9 +1318,9 @@ export class AutonomousTrader {
       ? Number((currentPrice + slippagePoints).toFixed(asset.decimals))
       : Number((currentPrice - slippagePoints).toFixed(asset.decimals));
 
-    // Adaptive Volatility Point Sizing for Nifty 50:
-    // Standard intraday stop distance = ~48.0 points (accommodates 5m Nifty ATR breathing room)
-    const stopDistance = 48.0;
+    // Dynamic Volatility ATR(14) Stop Distance for Nifty 50:
+    // Clamped between 28.0 and 55.0 points to absorb normal 5m noise while preventing bloated risk
+    const stopDistance = Number(Math.max(28.0, Math.min(55.0, (atr || 25.0) * 1.5)).toFixed(asset.decimals));
     const pointValue = Number((riskAmount / stopDistance).toFixed(4));
     const targetDistance = Number((stopDistance * this.riskRewardRatio).toFixed(asset.decimals));
 
@@ -1180,8 +1342,11 @@ export class AutonomousTrader {
     let confluenceScore = isForced ? 95 : 0;
     const confluences = [];
 
-    // 1. Trend Filter: Price respect to 20 EMA (+25 pts)
-    if (type === 'BUY' && executedPrice >= (ema20 || executedPrice) * 0.998) {
+    // 1. Candlestick Price Action Rejection (+25 pts)
+    if (patternName) {
+      if (!isForced) confluenceScore += 25;
+      confluences.push(patternName);
+    } else if (type === 'BUY' && executedPrice >= (ema20 || executedPrice) * 0.998) {
       if (!isForced) confluenceScore += 25;
       confluences.push('20 EMA Uptrend Support (Nifty 50)');
     } else if (type === 'SELL' && executedPrice <= (ema20 || executedPrice) * 1.002) {
@@ -1192,26 +1357,19 @@ export class AutonomousTrader {
       confluences.push(`${type === 'BUY' ? 'Bullish' : 'Bearish'} Momentum Continuation`);
     }
 
-    // 2. Momentum Filter: Healthy RSI Range (+25 pts)
-    if ((type === 'BUY' && rsi >= 42 && rsi <= 68) || (type === 'SELL' && rsi >= 32 && rsi <= 56)) {
+    // 2. Trend & 9/20 EMA Spread Confirmation (+25 pts)
+    const emaSpread = Math.abs((ema9 || 0) - (ema20 || 0));
+    if (emaSpread >= 8.0) {
       if (!isForced) confluenceScore += 25;
-      confluences.push(`Healthy RSI Momentum (${rsi})`);
+      confluences.push(`Trending 9/20 EMA Spread (Δ ₹${emaSpread.toFixed(1)} pts)`);
     } else {
       if (!isForced) confluenceScore += 18;
-      confluences.push(`RSI Trend Flow (${rsi})`);
+      confluences.push(`EMA Trend Flow (${trend || 'CONFIRMED'})`);
     }
 
-    // 3. Institutional Session Window (+20 pts)
-    const now = new Date();
-    const istHour = (now.getUTCHours() + 5 + Math.floor((now.getUTCMinutes() + 30) / 60)) % 24;
-    const isNSEExpansion = (istHour >= 9 && istHour <= 11) || (istHour >= 13 && istHour <= 15);
-    if (isNSEExpansion) {
-      if (!isForced) confluenceScore += 20;
-      confluences.push('NSE Core Session Expansion');
-    } else {
-      if (!isForced) confluenceScore += 12;
-      confluences.push('Midday Consolidation Zone');
-    }
+    // 3. Volatility ATR(14) Risk Buffer (+20 pts)
+    if (!isForced) confluenceScore += 20;
+    confluences.push(`ATR(14) Risk Buffer (SL: ${stopDistance} pts, Target: ${targetDistance} pts)`);
 
     // 4. Learned Rules Clearance (+20 pts)
     if (!isForced) confluenceScore += 20;
@@ -1219,7 +1377,7 @@ export class AutonomousTrader {
 
     // 5. Dynamic Trailing Target (+10 pts)
     if (!isForced) confluenceScore += 10;
-    confluences.push(isForced ? 'Instant Operator Trigger' : '1:2.5 Uncapped Dynamic Trailing Target');
+    confluences.push(isForced ? 'Instant Operator Trigger' : '1:2.2 Uncapped Dynamic Trailing Target');
 
     const setupGrade = confluenceScore >= 90 ? 'A+' : confluenceScore >= 80 ? 'A' : 'B+';
 
@@ -1293,7 +1451,7 @@ export class AutonomousTrader {
     const trend = struct.trend;
 
     const setupType = (trend === 'BEARISH' || ema9 < ema20) ? 'SELL' : 'BUY';
-    this.executeTradeOrder(setupType, currentPrice, ema9, ema20, rsi, trend, true);
+    this.executeTradeOrder(setupType, currentPrice, ema9, ema20, rsi, trend, struct.atr, '⚡ Instant Operator Trigger', true);
 
     return {
       success: true,
